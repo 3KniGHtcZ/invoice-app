@@ -23,22 +23,24 @@ Full-stack application with a React + Vite frontend and Node.js Express backend.
 
 ## Development Commands
 
+**Package Manager:** Use `yarn` for all package management.
+
 ### Backend (port 3000)
 ```bash
 cd backend
-npm install
-npm run dev      # Development with hot reload (tsx watch)
-npm start        # Production run
+yarn install
+yarn dev         # Development with hot reload (tsx watch)
+yarn start       # Production run
 ```
 
 ### Frontend (port 5173)
 ```bash
 cd frontend
-npm install
-npm run dev      # Development server
-npm run build    # TypeScript compile + Vite build
-npm run lint     # ESLint
-npm run preview  # Preview production build
+yarn install
+yarn dev         # Development server
+yarn build       # TypeScript compile + Vite build
+yarn lint        # ESLint
+yarn preview     # Preview production build
 ```
 
 ## Architecture
