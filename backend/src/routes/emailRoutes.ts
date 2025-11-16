@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import { graphService } from '../services/graphService'
 import { requireAuth } from '../middleware/requireAuth'
 import { invoiceExtractionService } from '../services/invoiceExtractionService'
+import { databaseService } from '../services/databaseService'
 
 const router = Router()
 
@@ -76,6 +77,16 @@ router.post(
     try {
       const { messageId, attachmentId } = req.params
       const accessToken = req.session.accessToken!
+      const regenerate = req.query.regenerate === 'true'
+
+      // Try to get from database first (unless regenerate is requested)
+      if (!regenerate) {
+        const cachedData = databaseService.getInvoiceData(messageId, attachmentId)
+        if (cachedData) {
+          console.log('Returning cached invoice data from database')
+          return res.json({ ...cachedData, fromCache: true })
+        }
+      }
 
       // Get PDF content
       const contentBytes = await graphService.getAttachmentContent(
@@ -85,9 +96,14 @@ router.post(
       )
 
       // Extract invoice data using Gemini AI
+      console.log('Extracting invoice data with AI...')
       const invoiceData = await invoiceExtractionService.extractInvoiceData(contentBytes)
 
-      res.json(invoiceData)
+      // Save to database
+      databaseService.saveInvoiceData(messageId, attachmentId, invoiceData)
+      console.log('Invoice data saved to database')
+
+      res.json({ ...invoiceData, fromCache: false })
     } catch (error) {
       console.error('Error extracting invoice data:', error)
       res.status(500).json({ error: 'Failed to extract invoice data' })

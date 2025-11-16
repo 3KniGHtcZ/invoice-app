@@ -5,6 +5,12 @@ node_modules/
 .env
 .env.local
 
+# Database
+invoices.db
+invoices.db-journal
+sessions.db
+sessions.db-journal
+
 # Build output
 dist/
 build/

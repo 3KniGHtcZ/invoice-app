@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Mail, FileText, Paperclip, LogOut, Sparkles } from 'lucide-react'
+import { Mail, FileText, Paperclip, LogOut, Sparkles, RefreshCw, Database } from 'lucide-react'
 
 interface EmailMessage {
   id: string
@@ -31,6 +31,7 @@ interface InvoiceData {
   variableSymbol: string | null
   currency: string | null
   bankAccount: string | null
+  fromCache?: boolean
 }
 
 function App() {
@@ -175,17 +176,15 @@ function App() {
     window.open(url, '_blank')
   }
 
-  const extractInvoiceData = async (messageId: string, attachmentId: string) => {
+  const extractInvoiceData = async (messageId: string, attachmentId: string, regenerate = false) => {
     setExtractingAttachmentId(attachmentId)
     setError(null)
     try {
-      const response = await fetch(
-        `/api/emails/${messageId}/attachments/${attachmentId}/extract`,
-        {
-          method: 'POST',
-          credentials: 'include',
-        }
-      )
+      const url = `/api/emails/${messageId}/attachments/${attachmentId}/extract${regenerate ? '?regenerate=true' : ''}`
+      const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+      })
       if (!response.ok) {
         throw new Error('Failed to extract invoice data')
       }
@@ -368,10 +367,35 @@ function App() {
         {isAuthenticated && invoiceData && (
           <Card className="mt-6 relative">
             <CardHeader>
-              <CardTitle>Extracted Invoice Data</CardTitle>
-              <CardDescription>
-                Data extracted from the PDF using AI
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Extracted Invoice Data</CardTitle>
+                  <CardDescription className="flex items-center gap-2 mt-1">
+                    {invoiceData.fromCache ? (
+                      <>
+                        <Database className="w-4 h-4 text-green-600" />
+                        <span>Loaded from database (cached)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-blue-600" />
+                        <span>Freshly extracted with AI</span>
+                      </>
+                    )}
+                  </CardDescription>
+                </div>
+                {currentInvoiceAttachmentId && selectedEmail && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => extractInvoiceData(selectedEmail, currentInvoiceAttachmentId, true)}
+                    disabled={extractingAttachmentId === currentInvoiceAttachmentId}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Regenerate
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {/* Loading overlay when extracting different invoice */}
