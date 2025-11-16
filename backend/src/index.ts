@@ -2,11 +2,15 @@ import express, { Request, Response } from 'express'
 import cors from 'cors'
 import session from 'express-session'
 import dotenv from 'dotenv'
+import connectSqlite3 from 'connect-sqlite3'
 import authRoutes from './routes/authRoutes'
 import emailRoutes from './routes/emailRoutes'
 import './types/session.types'
 
 dotenv.config()
+
+// Initialize SQLite session store
+const SQLiteStore = connectSqlite3(session)
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -23,6 +27,10 @@ app.use(express.json())
 // Session configuration
 app.use(
   session({
+    store: new SQLiteStore({
+      db: 'sessions.db',
+      dir: './',
+    }),
     secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
     resave: false,
     saveUninitialized: false,
