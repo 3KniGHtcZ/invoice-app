@@ -1,12 +1,38 @@
 import express, { Request, Response } from 'express'
 import cors from 'cors'
+import session from 'express-session'
+import dotenv from 'dotenv'
+import authRoutes from './routes/authRoutes'
+import emailRoutes from './routes/emailRoutes'
+import './types/session.types'
+
+dotenv.config()
 
 const app = express()
-const PORT = 3000
+const PORT = process.env.PORT || 3000
 
 // Middleware
-app.use(cors())
+app.use(
+  cors({
+    origin: 'http://localhost:5173',
+    credentials: true,
+  })
+)
 app.use(express.json())
+
+// Session configuration
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+)
 
 // In-memory data store
 interface Message {
@@ -24,6 +50,12 @@ let messages: Message[] = [
 ]
 
 let nextId = 2
+
+// Auth routes
+app.use('/api/auth', authRoutes)
+
+// Email routes
+app.use('/api/emails', emailRoutes)
 
 // Routes
 app.get('/api/messages', (req: Request, res: Response) => {
