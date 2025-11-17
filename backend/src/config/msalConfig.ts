@@ -22,8 +22,12 @@ export const msalConfig: Configuration = {
   },
 }
 
-export const REDIRECT_URI = 'http://localhost:3000/api/auth/callback'
-export const POST_LOGOUT_REDIRECT_URI = 'http://localhost:5173'
+// Redirect URIs - configurable via environment variables for production
+export const REDIRECT_URI =
+  process.env.REDIRECT_URI || 'http://localhost:3000/api/auth/callback'
+
+export const POST_LOGOUT_REDIRECT_URI =
+  process.env.FRONTEND_URL || 'http://localhost:5173'
 
 // Microsoft Graph scopes - must match Azure AD app registration
 export const SCOPES = [

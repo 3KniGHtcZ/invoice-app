@@ -3,7 +3,6 @@ import cors from 'cors'
 import session from 'express-session'
 import dotenv from 'dotenv'
 import connectSqlite3 from 'connect-sqlite3'
-import cron from 'node-cron'
 import helmet from 'helmet'
 import authRoutes from './routes/authRoutes'
 import emailRoutes from './routes/emailRoutes'
@@ -80,11 +79,14 @@ if (!process.env.SESSION_SECRET) {
   throw new Error('SESSION_SECRET environment variable is required')
 }
 
+// Use /app/data in production (Docker), current directory in development
+const sessionDbDir = process.env.NODE_ENV === 'production' ? '/app/data' : './'
+
 app.use(
   session({
     store: new SQLiteStore({
       db: 'sessions.db',
-      dir: './',
+      dir: sessionDbDir,
     }),
     secret: process.env.SESSION_SECRET,
     resave: false,
@@ -111,34 +113,6 @@ app.get('/api/health', (req: Request, res: Response) => {
 
 // Initialize sync service from database
 syncService.initializeFromDatabase()
-
-// Setup cron job for automatic email synchronization (every 10 minutes)
-cron.schedule('*/10 * * * *', async () => {
-  console.log('Running scheduled email sync...')
-
-  try {
-    // Get valid access token (will automatically refresh if needed)
-    const accessToken = await tokenManagerService.getValidAccessToken()
-
-    if (!accessToken) {
-      console.log('No valid access token available - user needs to log in first')
-      return
-    }
-
-    // Run sync with the valid token
-    const result = await syncService.syncEmails(accessToken)
-
-    if (result.success) {
-      console.log(`Scheduled sync completed: ${result.newInvoices} new invoices found`)
-    } else {
-      console.error('Scheduled sync failed:', result.error)
-    }
-  } catch (error) {
-    console.error('Error in scheduled sync:', error)
-  }
-})
-
-console.log('Email sync cron job scheduled (every 10 minutes)')
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`)

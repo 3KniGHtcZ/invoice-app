@@ -35,7 +35,7 @@ router.get('/callback', async (req: Request, res: Response) => {
 
     // Store tokens in session
     req.session.accessToken = tokens.accessToken
-    req.session.refreshToken = tokens.refreshToken
+    req.session.refreshToken = tokens.refreshToken || undefined
     req.session.tokenExpiresAt = tokens.expiresOn ? tokens.expiresOn.getTime() : undefined
 
     // Save tokens to database for background jobs
@@ -47,7 +47,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     await tokenManagerService.saveTokens(
       userId,
       tokens.accessToken,
-      tokens.refreshToken!,
+      tokens.refreshToken || null,
       expiresIn
     )
 

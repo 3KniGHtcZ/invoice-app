@@ -3,8 +3,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Mail, FileText, Paperclip, LogOut, Sparkles, RefreshCw, Database, CheckCircle2, Cloud } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { useEmails, type EmailMessage } from '@/hooks/useEmails'
-import { useAttachments, type EmailAttachment, type InvoiceData } from '@/hooks/useAttachments'
+import { useEmails } from '@/hooks/useEmails'
+import { useAttachments } from '@/hooks/useAttachments'
 
 function App() {
   // Custom hooks

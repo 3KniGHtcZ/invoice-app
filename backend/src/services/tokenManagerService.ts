@@ -17,7 +17,7 @@ class TokenManagerService {
   /**
    * Save tokens to database after successful authentication
    */
-  async saveTokens(userId: string, accessToken: string, refreshToken: string, expiresIn: number): Promise<void> {
+  async saveTokens(userId: string, accessToken: string, refreshToken: string | null, expiresIn: number): Promise<void> {
     // Calculate expiration time
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
 
@@ -54,6 +54,11 @@ class TokenManagerService {
     }
 
     // Token expired or expiring soon, refresh it
+    if (!tokens.refreshToken) {
+      console.log('No refresh token available, re-authentication required')
+      return null
+    }
+
     console.log('Access token expired or expiring soon, refreshing...')
     return await this.refreshAccessToken(tokens.refreshToken)
   }
@@ -61,7 +66,11 @@ class TokenManagerService {
   /**
    * Refresh the access token using the refresh token
    */
-  private async refreshAccessToken(refreshToken: string): Promise<string | null> {
+  private async refreshAccessToken(refreshToken: string | null): Promise<string | null> {
+    if (!refreshToken) {
+      console.log('No refresh token provided')
+      return null
+    }
     try {
       const refreshRequest = {
         refreshToken: refreshToken,

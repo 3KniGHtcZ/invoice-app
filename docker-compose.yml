@@ -1,0 +1,47 @@
+services:
+  invoice-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: invoice-app
+    ports:
+      - "9080:80"  # Map container port 80 to host port 9080
+    volumes:
+      # Persist database files
+      - ./data:/app/data
+      # Optionally mount logs for debugging
+      - ./logs:/app/logs
+    env_file:
+      - .env.production  # Load environment variables from .env.production
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - invoice-network
+
+networks:
+  invoice-network:
+    driver: bridge
+
+# =============================================================================
+# Usage:
+# =============================================================================
+# 1. Copy .env.production.example to .env.production and fill in your values
+# 2. Build and start: docker-compose up -d
+# 3. View logs: docker-compose logs -f
+# 4. Stop: docker-compose down
+# 5. Rebuild after code changes: docker-compose up -d --build
+#
+# The application will be available at: http://localhost:9080
+#
+# Data persistence:
+# - Database files are stored in ./data directory
+# - Logs are stored in ./logs directory
+# - Both directories will be created automatically if they don't exist

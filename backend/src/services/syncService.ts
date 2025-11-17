@@ -1,6 +1,5 @@
 import { graphService } from './graphService'
 import { databaseService } from './databaseService'
-import { notificationQueue } from './notificationQueue'
 
 interface SyncResult {
   success: boolean
@@ -32,10 +31,6 @@ class SyncService {
       this.knownEmailIds = currentEmailIds
       this.isInitialized = true
 
-      // Queue Discord notifications for new invoices (NON-BLOCKING)
-      if (newEmails.length > 0) {
-        this.queueDiscordNotifications(newEmails)
-      }
 
       // Update last sync timestamp
       this.lastSyncTimestamp = startTime
@@ -57,44 +52,6 @@ class SyncService {
         error: error instanceof Error ? error.message : 'Unknown error'
       }
     }
-  }
-
-  /**
-   * Queue Discord notifications for background processing (non-blocking)
-   */
-  private queueDiscordNotifications(newEmails: any[]) {
-    for (const email of newEmails) {
-      const message = {
-        embeds: [{
-          title: '📧 Nová faktura',
-          description: email.subject,
-          color: 0x00ff00, // Green
-          fields: [
-            {
-              name: 'Od',
-              value: email.from || 'N/A',
-              inline: true
-            },
-            {
-              name: 'Datum',
-              value: new Date(email.receivedDateTime).toLocaleString('cs-CZ'),
-              inline: true
-            },
-            {
-              name: 'Má přílohy',
-              value: email.hasAttachments ? 'Ano' : 'Ne',
-              inline: true
-            }
-          ],
-          timestamp: email.receivedDateTime
-        }]
-      }
-
-      // Queue for background processing (returns immediately)
-      notificationQueue.enqueue('discord', message)
-    }
-
-    console.log(`Queued ${newEmails.length} Discord notifications for background processing`)
   }
 
   getLastSyncTimestamp(): string | null {

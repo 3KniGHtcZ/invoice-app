@@ -13,7 +13,7 @@ interface InvoiceRecord extends InvoiceData {
 export interface AuthTokens {
   userId: string
   accessToken: string
-  refreshToken: string
+  refreshToken: string | null
   expiresAt: string
 }
 
@@ -21,7 +21,10 @@ class DatabaseService {
   private db: Database.Database
 
   constructor() {
-    const dbPath = path.join(process.cwd(), 'invoices.db')
+    // Use /app/data in production (Docker), process.cwd() in development
+    const dataDir = process.env.NODE_ENV === 'production' ? '/app/data' : process.cwd()
+    const dbPath = path.join(dataDir, 'invoices.db')
+    console.log(`Using database path: ${dbPath}`)
     this.db = new Database(dbPath)
     this.initialize()
   }
@@ -72,11 +75,45 @@ class DatabaseService {
         id INTEGER PRIMARY KEY CHECK (id = 1),
         user_id TEXT NOT NULL,
         access_token TEXT NOT NULL,
-        refresh_token TEXT NOT NULL,
+        refresh_token TEXT,
         expires_at DATETIME NOT NULL,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `).run()
+
+    // Migrate existing databases: make refresh_token nullable if it exists
+    try {
+      this.db.prepare(`
+        CREATE TABLE IF NOT EXISTS auth_tokens_new (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          user_id TEXT NOT NULL,
+          access_token TEXT NOT NULL,
+          refresh_token TEXT,
+          expires_at DATETIME NOT NULL,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run()
+
+      // Check if we need to migrate
+      const tableInfo = this.db.prepare("PRAGMA table_info(auth_tokens)").all() as any[]
+      const refreshTokenColumn = tableInfo.find(col => col.name === 'refresh_token')
+
+      if (refreshTokenColumn && refreshTokenColumn.notnull === 1) {
+        // Migration needed
+        this.db.prepare(`
+          INSERT INTO auth_tokens_new (id, user_id, access_token, refresh_token, expires_at, updated_at)
+          SELECT id, user_id, access_token, refresh_token, expires_at, updated_at FROM auth_tokens
+        `).run()
+        this.db.prepare('DROP TABLE auth_tokens').run()
+        this.db.prepare('ALTER TABLE auth_tokens_new RENAME TO auth_tokens').run()
+      } else {
+        // No migration needed, drop temp table
+        this.db.prepare('DROP TABLE IF NOT EXISTS auth_tokens_new').run()
+      }
+    } catch (err) {
+      // Migration already done or error - continue
+      console.log('Auth tokens table migration check:', err)
+    }
   }
 
   getInvoiceData(messageId: string, attachmentId: string): InvoiceData | null {
