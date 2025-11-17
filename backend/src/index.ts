@@ -4,6 +4,7 @@ import session from 'express-session'
 import dotenv from 'dotenv'
 import connectSqlite3 from 'connect-sqlite3'
 import cron from 'node-cron'
+import helmet from 'helmet'
 import authRoutes from './routes/authRoutes'
 import emailRoutes from './routes/emailRoutes'
 import { syncService } from './services/syncService'
@@ -19,28 +20,82 @@ const app = express()
 const PORT = process.env.PORT || 3000
 
 // Middleware
+
+// Security headers
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline needed for OAuth callback page
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'", 'https://login.microsoftonline.com', 'https://graph.microsoft.com'],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+      },
+    },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    referrerPolicy: {
+      policy: 'strict-origin-when-cross-origin',
+    },
+    noSniff: true,
+    xssFilter: true,
+    hidePoweredBy: true,
+  })
+)
+
+// CORS configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:5173']
+
 app.use(
   cors({
-    origin: 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true)
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true)
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`))
+      }
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Length', 'Content-Type'],
+    maxAge: 600, // Cache preflight for 10 minutes
   })
 )
 app.use(express.json())
 
 // Session configuration
+if (!process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET environment variable is required')
+}
+
 app.use(
   session({
     store: new SQLiteStore({
       db: 'sessions.db',
       dir: './',
     }),
-    secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    name: 'invoice.sid', // Don't use default name
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
     },
   })
 )

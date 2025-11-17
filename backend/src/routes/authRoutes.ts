@@ -52,6 +52,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     )
 
     // Redirect to frontend with success message
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
     res.send(`
       <html>
         <head>
@@ -63,11 +64,11 @@ router.get('/callback', async (req: Request, res: Response) => {
           <script>
             // Close popup window if opened from popup
             if (window.opener) {
-              window.opener.postMessage({ type: 'AUTH_SUCCESS' }, '*');
+              window.opener.postMessage({ type: 'AUTH_SUCCESS' }, '${frontendUrl}');
               window.close();
             } else {
               // If not popup, redirect to frontend
-              window.location.href = 'http://localhost:5173';
+              window.location.href = '${frontendUrl}';
             }
           </script>
         </body>
@@ -75,6 +76,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     `)
   } catch (error) {
     console.error('Callback error:', error)
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
     res.status(500).send(`
       <html>
         <head>
@@ -85,7 +87,7 @@ router.get('/callback', async (req: Request, res: Response) => {
           <p>Please try again.</p>
           <script>
             if (window.opener) {
-              window.opener.postMessage({ type: 'AUTH_ERROR' }, '*');
+              window.opener.postMessage({ type: 'AUTH_ERROR' }, '${frontendUrl}');
               window.close();
             }
           </script>

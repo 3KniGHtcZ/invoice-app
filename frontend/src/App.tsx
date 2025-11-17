@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Mail, FileText, Paperclip, LogOut, Sparkles, RefreshCw, Database, CheckCircle2, Cloud } from 'lucide-react'
+import { BACKEND_URL, FRONTEND_URL } from '@/config/constants'
 
 interface EmailMessage {
   id: string
@@ -54,6 +55,13 @@ function App() {
 
     // Listen for OAuth callback from popup
     const handleMessage = (event: MessageEvent) => {
+      // SECURITY: Validate origin before processing
+      const allowedOrigins = [BACKEND_URL, FRONTEND_URL]
+      if (!allowedOrigins.includes(event.origin)) {
+        console.warn(`Rejected message from unauthorized origin: ${event.origin}`)
+        return
+      }
+
       if (event.data.type === 'AUTH_SUCCESS') {
         console.log('Authentication successful!')
         checkAuthStatus()
