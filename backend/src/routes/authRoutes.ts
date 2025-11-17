@@ -51,49 +51,13 @@ router.get('/callback', async (req: Request, res: Response) => {
       expiresIn
     )
 
-    // Redirect to frontend with success message
+    // Redirect back to frontend
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    res.send(`
-      <html>
-        <head>
-          <title>Login Successful</title>
-        </head>
-        <body>
-          <h2>Authentication successful!</h2>
-          <p>You can close this window now.</p>
-          <script>
-            // Close popup window if opened from popup
-            if (window.opener) {
-              window.opener.postMessage({ type: 'AUTH_SUCCESS' }, '${frontendUrl}');
-              window.close();
-            } else {
-              // If not popup, redirect to frontend
-              window.location.href = '${frontendUrl}';
-            }
-          </script>
-        </body>
-      </html>
-    `)
+    res.redirect(frontendUrl)
   } catch (error) {
     console.error('Callback error:', error)
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    res.status(500).send(`
-      <html>
-        <head>
-          <title>Login Failed</title>
-        </head>
-        <body>
-          <h2>Authentication failed</h2>
-          <p>Please try again.</p>
-          <script>
-            if (window.opener) {
-              window.opener.postMessage({ type: 'AUTH_ERROR' }, '${frontendUrl}');
-              window.close();
-            }
-          </script>
-        </body>
-      </html>
-    `)
+    res.redirect(`${frontendUrl}?error=auth_failed`)
   }
 })
 

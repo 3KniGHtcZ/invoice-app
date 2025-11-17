@@ -26,3 +26,6 @@ npm-debug.log*
 # Testing
 coverage/
 .env.production
+
+# Data
+data/

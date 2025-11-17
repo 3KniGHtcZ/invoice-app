@@ -93,11 +93,11 @@ app.use(
     saveUninitialized: false,
     name: 'invoice.sid', // Don't use default name
     cookie: {
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.COOKIE_SECURE === 'true',
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-      domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
+      sameSite: process.env.COOKIE_SECURE === 'true' ? 'strict' : 'lax',
+      domain: process.env.COOKIE_DOMAIN || undefined,
     },
   })
 )

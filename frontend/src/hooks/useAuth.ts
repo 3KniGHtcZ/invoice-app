@@ -1,33 +1,13 @@
 import { useState, useEffect } from 'react'
-import { BACKEND_URL, FRONTEND_URL } from '@/config/constants'
 
 export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Check auth status on mount and when returning from OAuth redirect
   useEffect(() => {
     checkAuthStatus()
-
-    // Listen for OAuth callback from popup
-    const handleMessage = (event: MessageEvent) => {
-      // SECURITY: Validate origin before processing
-      const allowedOrigins = [BACKEND_URL, FRONTEND_URL]
-      if (!allowedOrigins.includes(event.origin)) {
-        console.warn(`Rejected message from unauthorized origin: ${event.origin}`)
-        return
-      }
-
-      if (event.data.type === 'AUTH_SUCCESS') {
-        console.log('Authentication successful!')
-        checkAuthStatus()
-      } else if (event.data.type === 'AUTH_ERROR') {
-        setError('Authentication failed. Please try again.')
-      }
-    }
-
-    window.addEventListener('message', handleMessage)
-    return () => window.removeEventListener('message', handleMessage)
   }, [])
 
   const checkAuthStatus = async () => {
@@ -56,17 +36,8 @@ export function useAuth() {
       const data = await response.json()
 
       if (data.authUrl) {
-        // Open popup window for OAuth
-        const width = 600
-        const height = 700
-        const left = window.screen.width / 2 - width / 2
-        const top = window.screen.height / 2 - height / 2
-
-        window.open(
-          data.authUrl,
-          'Microsoft Login',
-          `width=${width},height=${height},left=${left},top=${top}`
-        )
+        // Redirect to OAuth in same window
+        window.location.href = data.authUrl
       }
     } catch (err) {
       console.error('Login error:', err)
