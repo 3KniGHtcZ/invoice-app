@@ -108,7 +108,7 @@ class DatabaseService {
         this.db.prepare('ALTER TABLE auth_tokens_new RENAME TO auth_tokens').run()
       } else {
         // No migration needed, drop temp table
-        this.db.prepare('DROP TABLE IF NOT EXISTS auth_tokens_new').run()
+        this.db.prepare('DROP TABLE IF EXISTS auth_tokens_new').run()
       }
     } catch (err) {
       // Migration already done or error - continue
