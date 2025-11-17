@@ -1,5 +1,6 @@
 import { graphService } from './graphService'
 import { databaseService } from './databaseService'
+import { notificationQueue } from './notificationQueue'
 
 interface SyncResult {
   success: boolean
@@ -31,9 +32,9 @@ class SyncService {
       this.knownEmailIds = currentEmailIds
       this.isInitialized = true
 
-      // Send Discord notifications for new invoices
+      // Queue Discord notifications for new invoices (NON-BLOCKING)
       if (newEmails.length > 0) {
-        await this.sendDiscordNotifications(newEmails)
+        this.queueDiscordNotifications(newEmails)
       }
 
       // Update last sync timestamp
@@ -58,56 +59,42 @@ class SyncService {
     }
   }
 
-  private async sendDiscordNotifications(newEmails: any[]) {
-    const webhookUrl = process.env.DISCORD_WEBHOOK_URL
-
-    if (!webhookUrl) {
-      console.warn('DISCORD_WEBHOOK_URL not set, skipping Discord notifications')
-      return
-    }
-
+  /**
+   * Queue Discord notifications for background processing (non-blocking)
+   */
+  private queueDiscordNotifications(newEmails: any[]) {
     for (const email of newEmails) {
-      try {
-        const message = {
-          embeds: [{
-            title: '📧 Nová faktura',
-            description: email.subject,
-            color: 0x00ff00, // Green
-            fields: [
-              {
-                name: 'Od',
-                value: email.from || 'N/A',
-                inline: true
-              },
-              {
-                name: 'Datum',
-                value: new Date(email.receivedDateTime).toLocaleString('cs-CZ'),
-                inline: true
-              },
-              {
-                name: 'Má přílohy',
-                value: email.hasAttachments ? 'Ano' : 'Ne',
-                inline: true
-              }
-            ],
-            timestamp: email.receivedDateTime
-          }]
-        }
-
-        await fetch(webhookUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(message)
-        })
-
-        // Rate limit: wait 1 second between notifications
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      } catch (error) {
-        console.error('Error sending Discord notification:', error)
+      const message = {
+        embeds: [{
+          title: '📧 Nová faktura',
+          description: email.subject,
+          color: 0x00ff00, // Green
+          fields: [
+            {
+              name: 'Od',
+              value: email.from || 'N/A',
+              inline: true
+            },
+            {
+              name: 'Datum',
+              value: new Date(email.receivedDateTime).toLocaleString('cs-CZ'),
+              inline: true
+            },
+            {
+              name: 'Má přílohy',
+              value: email.hasAttachments ? 'Ano' : 'Ne',
+              inline: true
+            }
+          ],
+          timestamp: email.receivedDateTime
+        }]
       }
+
+      // Queue for background processing (returns immediately)
+      notificationQueue.enqueue('discord', message)
     }
+
+    console.log(`Queued ${newEmails.length} Discord notifications for background processing`)
   }
 
   getLastSyncTimestamp(): string | null {
