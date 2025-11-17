@@ -68,6 +68,6 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Image digest
-        env:
-          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
-        run: echo "Built and pushed images with tags: $IMAGE_TAGS"
+        run: |
+          echo "Built and pushed images with tags:"
+          echo "${{ steps.meta.outputs.tags }}"
