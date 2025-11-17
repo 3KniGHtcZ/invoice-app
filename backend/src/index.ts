@@ -100,51 +100,11 @@ app.use(
   })
 )
 
-// In-memory data store
-interface Message {
-  id: number
-  text: string
-  timestamp: string
-}
-
-let messages: Message[] = [
-  {
-    id: 1,
-    text: 'Welcome to the example app!',
-    timestamp: new Date().toISOString(),
-  },
-]
-
-let nextId = 2
-
-// Auth routes
+// Routes
 app.use('/api/auth', authRoutes)
-
-// Email routes
 app.use('/api/emails', emailRoutes)
 
-// Routes
-app.get('/api/messages', (req: Request, res: Response) => {
-  res.json(messages)
-})
-
-app.post('/api/messages', (req: Request, res: Response) => {
-  const { text } = req.body
-
-  if (!text || typeof text !== 'string') {
-    return res.status(400).json({ error: 'Text is required' })
-  }
-
-  const newMessage: Message = {
-    id: nextId++,
-    text,
-    timestamp: new Date().toISOString(),
-  }
-
-  messages.push(newMessage)
-  res.status(201).json(newMessage)
-})
-
+// Health check
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })

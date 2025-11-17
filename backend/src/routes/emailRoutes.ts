@@ -4,11 +4,12 @@ import { requireAuth } from '../middleware/requireAuth'
 import { invoiceExtractionService } from '../services/invoiceExtractionService'
 import { databaseService } from '../services/databaseService'
 import { syncService } from '../services/syncService'
+import { cachePresets } from '../middleware/cacheControl'
 
 const router = Router()
 
 // List all folders
-router.get('/folders', requireAuth, async (req: Request, res: Response) => {
+router.get('/folders', requireAuth, cachePresets.mediumCache, async (req: Request, res: Response) => {
   try {
     const accessToken = req.session.accessToken!
     const folders = await graphService.listAllFolders(accessToken)
@@ -20,7 +21,7 @@ router.get('/folders', requireAuth, async (req: Request, res: Response) => {
 })
 
 // Get emails from 'faktury' folder
-router.get('/faktury', requireAuth, async (req: Request, res: Response) => {
+router.get('/faktury', requireAuth, cachePresets.shortCache, async (req: Request, res: Response) => {
   try {
     const accessToken = req.session.accessToken!
     const emails = await graphService.getEmailsFromFolder(accessToken, 'faktury')
@@ -39,7 +40,7 @@ router.get('/faktury', requireAuth, async (req: Request, res: Response) => {
 })
 
 // Get attachments for a specific email
-router.get('/:messageId/attachments', requireAuth, async (req: Request, res: Response) => {
+router.get('/:messageId/attachments', requireAuth, cachePresets.mediumCache, async (req: Request, res: Response) => {
   try {
     const { messageId } = req.params
     const accessToken = req.session.accessToken!
