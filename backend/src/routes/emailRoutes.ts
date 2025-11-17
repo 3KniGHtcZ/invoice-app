@@ -39,6 +39,29 @@ router.get('/faktury', requireAuth, cachePresets.shortCache, async (req: Request
   }
 })
 
+// Batch get attachments for multiple emails (fixes N+1 query pattern)
+router.post('/attachments/batch', requireAuth, cachePresets.mediumCache, async (req: Request, res: Response) => {
+  try {
+    const { messageIds } = req.body
+
+    if (!Array.isArray(messageIds) || messageIds.length === 0) {
+      return res.status(400).json({ error: 'messageIds must be a non-empty array' })
+    }
+
+    // Limit batch size to prevent abuse
+    if (messageIds.length > 50) {
+      return res.status(400).json({ error: 'Maximum 50 message IDs allowed per batch request' })
+    }
+
+    const accessToken = req.session.accessToken!
+    const batchAttachments = await graphService.getBatchEmailAttachments(accessToken, messageIds)
+    res.json(batchAttachments)
+  } catch (error) {
+    console.error('Error fetching batch attachments:', error)
+    res.status(500).json({ error: 'Failed to fetch batch attachments' })
+  }
+})
+
 // Get attachments for a specific email
 router.get('/:messageId/attachments', requireAuth, cachePresets.mediumCache, async (req: Request, res: Response) => {
   try {

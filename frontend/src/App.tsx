@@ -43,6 +43,7 @@ function App() {
   const [emails, setEmails] = useState<EmailMessage[]>([])
   const [selectedEmail, setSelectedEmail] = useState<string | null>(null)
   const [attachments, setAttachments] = useState<EmailAttachment[]>([])
+  const [allAttachments, setAllAttachments] = useState<Record<string, EmailAttachment[]>>({})
   const [selectedAttachment, setSelectedAttachment] = useState<string | null>(null)
   const [loadingEmails, setLoadingEmails] = useState(false)
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
@@ -160,6 +161,12 @@ function App() {
       }
       const data = await response.json()
       setEmails(data)
+
+      // Batch fetch attachments for all emails with attachments (fixes N+1 query)
+      const emailsWithAttachments = data.filter((email: EmailMessage) => email.hasAttachments)
+      if (emailsWithAttachments.length > 0) {
+        fetchBatchAttachments(emailsWithAttachments.map((e: EmailMessage) => e.id))
+      }
     } catch (err) {
       console.error('Error fetching emails:', err)
       setError('Failed to fetch emails from faktury folder')
@@ -168,7 +175,45 @@ function App() {
     }
   }
 
+  const fetchBatchAttachments = async (messageIds: string[]) => {
+    try {
+      const response = await fetch('/api/emails/attachments/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ messageIds }),
+      })
+      if (!response.ok) {
+        throw new Error('Failed to batch fetch attachments')
+      }
+      const batchData = await response.json()
+      setAllAttachments(batchData)
+    } catch (err) {
+      console.error('Error batch fetching attachments:', err)
+      // Don't set error - attachments will be fetched individually on demand
+    }
+  }
+
   const fetchAttachments = async (messageId: string) => {
+    // Try to use cached batch data first
+    if (allAttachments[messageId]) {
+      const data = allAttachments[messageId]
+      setAttachments(data)
+      setSelectedEmail(messageId)
+
+      // Automatically select and extract first attachment
+      if (data.length > 0) {
+        const firstAttachment = data[0]
+        setSelectedAttachment(firstAttachment.id)
+        // Auto-extract for first attachment
+        extractInvoiceData(messageId, firstAttachment.id)
+      }
+      return
+    }
+
+    // Fallback to individual fetch if not in cache
     try {
       const response = await fetch(`/api/emails/${messageId}/attachments`, {
         credentials: 'include',
@@ -179,6 +224,9 @@ function App() {
       const data = await response.json()
       setAttachments(data)
       setSelectedEmail(messageId)
+
+      // Cache the result
+      setAllAttachments((prev) => ({ ...prev, [messageId]: data }))
 
       // Automatically select and extract first attachment
       if (data.length > 0) {

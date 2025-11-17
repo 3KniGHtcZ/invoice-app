@@ -117,6 +117,44 @@ class GraphService {
       throw error
     }
   }
+
+  /**
+   * Batch fetch attachments for multiple messages (fixes N+1 query pattern)
+   */
+  async getBatchEmailAttachments(
+    accessToken: string,
+    messageIds: string[]
+  ): Promise<Record<string, EmailAttachment[]>> {
+    const client = this.getClient(accessToken)
+
+    try {
+      // Fetch attachments for all messages in parallel
+      const attachmentPromises = messageIds.map(async (messageId) => {
+        try {
+          const attachments = await this.getEmailAttachments(accessToken, messageId)
+          return { messageId, attachments }
+        } catch (error) {
+          console.error(`Error fetching attachments for message ${messageId}:`, error)
+          // Return empty array for failed requests instead of failing the entire batch
+          return { messageId, attachments: [] }
+        }
+      })
+
+      const results = await Promise.all(attachmentPromises)
+
+      // Convert array to object keyed by messageId
+      return results.reduce(
+        (acc, { messageId, attachments }) => {
+          acc[messageId] = attachments
+          return acc
+        },
+        {} as Record<string, EmailAttachment[]>
+      )
+    } catch (error) {
+      console.error('Error in batch fetch attachments:', error)
+      throw error
+    }
+  }
 }
 
 export const graphService = new GraphService()
