@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { authService } from '../services/authService.js'
+import { tokenManagerService } from '../services/tokenManagerService'
 
 const router = Router()
 
@@ -36,6 +37,19 @@ router.get('/callback', async (req: Request, res: Response) => {
     req.session.accessToken = tokens.accessToken
     req.session.refreshToken = tokens.refreshToken
     req.session.tokenExpiresAt = tokens.expiresOn ? tokens.expiresOn.getTime() : undefined
+
+    // Save tokens to database for background jobs
+    const userId = tokens.account?.homeAccountId || 'default'
+    const expiresIn = tokens.expiresOn
+      ? Math.floor((tokens.expiresOn.getTime() - Date.now()) / 1000)
+      : 3600 // Default to 1 hour if not provided
+
+    await tokenManagerService.saveTokens(
+      userId,
+      tokens.accessToken,
+      tokens.refreshToken!,
+      expiresIn
+    )
 
     // Redirect to frontend with success message
     res.send(`
@@ -100,6 +114,9 @@ router.get('/status', (req: Request, res: Response) => {
  * Clear session and log out user
  */
 router.post('/logout', (req: Request, res: Response) => {
+  // Clear tokens from database
+  tokenManagerService.clearTokens()
+
   req.session.destroy((err) => {
     if (err) {
       console.error('Logout error:', err)

@@ -7,6 +7,7 @@ import cron from 'node-cron'
 import authRoutes from './routes/authRoutes'
 import emailRoutes from './routes/emailRoutes'
 import { syncService } from './services/syncService'
+import { tokenManagerService } from './services/tokenManagerService'
 import './types/session.types'
 
 dotenv.config()
@@ -97,12 +98,29 @@ app.get('/api/health', (req: Request, res: Response) => {
 syncService.initializeFromDatabase()
 
 // Setup cron job for automatic email synchronization (every 10 minutes)
-// Note: This requires a valid access token, which may not always be available
-// Consider implementing a system user or service account for this
 cron.schedule('*/10 * * * *', async () => {
   console.log('Running scheduled email sync...')
-  // This is a placeholder - in production you'd need to handle authentication
-  // for automated syncs differently (service account, refresh token, etc.)
+
+  try {
+    // Get valid access token (will automatically refresh if needed)
+    const accessToken = await tokenManagerService.getValidAccessToken()
+
+    if (!accessToken) {
+      console.log('No valid access token available - user needs to log in first')
+      return
+    }
+
+    // Run sync with the valid token
+    const result = await syncService.syncEmails(accessToken)
+
+    if (result.success) {
+      console.log(`Scheduled sync completed: ${result.newInvoices} new invoices found`)
+    } else {
+      console.error('Scheduled sync failed:', result.error)
+    }
+  } catch (error) {
+    console.error('Error in scheduled sync:', error)
+  }
 })
 
 console.log('Email sync cron job scheduled (every 10 minutes)')

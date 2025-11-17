@@ -10,6 +10,13 @@ interface InvoiceRecord extends InvoiceData {
   updatedAt: string
 }
 
+export interface AuthTokens {
+  userId: string
+  accessToken: string
+  refreshToken: string
+  expiresAt: string
+}
+
 class DatabaseService {
   private db: Database.Database
 
@@ -21,7 +28,7 @@ class DatabaseService {
 
   private initialize() {
     // Create invoices table if it doesn't exist
-    this.db.exec(`
+    this.db.prepare(`
       CREATE TABLE IF NOT EXISTS invoices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         message_id TEXT NOT NULL,
@@ -42,22 +49,34 @@ class DatabaseService {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(message_id, attachment_id)
       )
-    `)
+    `).run()
 
     // Create index for faster lookups
-    this.db.exec(`
+    this.db.prepare(`
       CREATE INDEX IF NOT EXISTS idx_message_attachment
       ON invoices(message_id, attachment_id)
-    `)
+    `).run()
 
     // Create sync metadata table
-    this.db.exec(`
+    this.db.prepare(`
       CREATE TABLE IF NOT EXISTS sync_metadata (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         last_sync_timestamp TEXT NOT NULL,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
-    `)
+    `).run()
+
+    // Create auth tokens table (single user mode)
+    this.db.prepare(`
+      CREATE TABLE IF NOT EXISTS auth_tokens (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        user_id TEXT NOT NULL,
+        access_token TEXT NOT NULL,
+        refresh_token TEXT NOT NULL,
+        expires_at DATETIME NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
   }
 
   getInvoiceData(messageId: string, attachmentId: string): InvoiceData | null {
@@ -160,6 +179,47 @@ class DatabaseService {
     `)
     const result = stmt.get() as { last_sync_timestamp: string } | undefined
     return result?.last_sync_timestamp || null
+  }
+
+  // Auth token management methods
+  saveAuthTokens(tokens: AuthTokens): void {
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO auth_tokens (
+        id,
+        user_id,
+        access_token,
+        refresh_token,
+        expires_at,
+        updated_at
+      ) VALUES (1, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `)
+    stmt.run(
+      tokens.userId,
+      tokens.accessToken,
+      tokens.refreshToken,
+      tokens.expiresAt
+    )
+  }
+
+  getAuthTokens(): AuthTokens | null {
+    const stmt = this.db.prepare(`
+      SELECT
+        user_id as userId,
+        access_token as accessToken,
+        refresh_token as refreshToken,
+        expires_at as expiresAt
+      FROM auth_tokens
+      WHERE id = 1
+    `)
+    const result = stmt.get() as AuthTokens | undefined
+    return result || null
+  }
+
+  clearAuthTokens(): void {
+    const stmt = this.db.prepare(`
+      DELETE FROM auth_tokens WHERE id = 1
+    `)
+    stmt.run()
   }
 
   close() {
