@@ -3,6 +3,7 @@ import { graphService } from '../services/graphService'
 import { requireAuth } from '../middleware/requireAuth'
 import { invoiceExtractionService } from '../services/invoiceExtractionService'
 import { databaseService } from '../services/databaseService'
+import { syncService } from '../services/syncService'
 
 const router = Router()
 
@@ -23,7 +24,14 @@ router.get('/faktury', requireAuth, async (req: Request, res: Response) => {
   try {
     const accessToken = req.session.accessToken!
     const emails = await graphService.getEmailsFromFolder(accessToken, 'faktury')
-    res.json(emails)
+
+    // Add extraction status to each email
+    const emailsWithStatus = emails.map((email: any) => ({
+      ...email,
+      hasExtractedData: databaseService.hasExtractedData(email.id)
+    }))
+
+    res.json(emailsWithStatus)
   } catch (error) {
     console.error('Error fetching faktury emails:', error)
     res.status(500).json({ error: 'Failed to fetch emails' })
@@ -110,5 +118,31 @@ router.post(
     }
   }
 )
+
+// Get sync status
+router.get('/sync/status', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const lastSync = syncService.getLastSyncTimestamp()
+    res.json({
+      lastSyncTimestamp: lastSync,
+      hasSync: lastSync !== null
+    })
+  } catch (error) {
+    console.error('Error getting sync status:', error)
+    res.status(500).json({ error: 'Failed to get sync status' })
+  }
+})
+
+// Trigger manual sync
+router.post('/sync', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const accessToken = req.session.accessToken!
+    const result = await syncService.syncEmails(accessToken)
+    res.json(result)
+  } catch (error) {
+    console.error('Error syncing emails:', error)
+    res.status(500).json({ error: 'Failed to sync emails' })
+  }
+})
 
 export default router

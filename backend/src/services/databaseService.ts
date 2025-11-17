@@ -49,6 +49,15 @@ class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_message_attachment
       ON invoices(message_id, attachment_id)
     `)
+
+    // Create sync metadata table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS sync_metadata (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        last_sync_timestamp TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
   }
 
   getInvoiceData(messageId: string, attachmentId: string): InvoiceData | null {
@@ -123,6 +132,34 @@ class DatabaseService {
       WHERE message_id = ? AND attachment_id = ?
     `)
     stmt.run(messageId, attachmentId)
+  }
+
+  hasExtractedData(messageId: string): boolean {
+    const stmt = this.db.prepare(`
+      SELECT COUNT(*) as count
+      FROM invoices
+      WHERE message_id = ?
+    `)
+    const result = stmt.get(messageId) as { count: number }
+    return result.count > 0
+  }
+
+  updateSyncTimestamp(timestamp: string): void {
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO sync_metadata (id, last_sync_timestamp, updated_at)
+      VALUES (1, ?, CURRENT_TIMESTAMP)
+    `)
+    stmt.run(timestamp)
+  }
+
+  getLastSyncTimestamp(): string | null {
+    const stmt = this.db.prepare(`
+      SELECT last_sync_timestamp
+      FROM sync_metadata
+      WHERE id = 1
+    `)
+    const result = stmt.get() as { last_sync_timestamp: string } | undefined
+    return result?.last_sync_timestamp || null
   }
 
   close() {
