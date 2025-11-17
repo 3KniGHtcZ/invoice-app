@@ -62,11 +62,16 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Copy supervisor configuration
 COPY supervisord.conf /etc/supervisord.conf
 
-# Create necessary directories
+# Create necessary directories with proper permissions
 RUN mkdir -p /app/data \
     && mkdir -p /app/logs \
     && mkdir -p /var/log/supervisor \
-    && mkdir -p /var/log/nginx
+    && mkdir -p /var/log/nginx \
+    && chmod -R 777 /app/data \
+    && chmod -R 777 /app/logs
+
+# Define volumes
+VOLUME ["/app/data", "/app/logs"]
 
 # Expose port 80 (nginx)
 EXPOSE 80
