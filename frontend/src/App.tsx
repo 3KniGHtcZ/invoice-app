@@ -1,317 +1,37 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Mail, FileText, Paperclip, LogOut, Sparkles, RefreshCw, Database, CheckCircle2, Cloud } from 'lucide-react'
-import { BACKEND_URL, FRONTEND_URL } from '@/config/constants'
-
-interface EmailMessage {
-  id: string
-  subject: string
-  from: string
-  receivedDateTime: string
-  hasAttachments: boolean
-  hasExtractedData?: boolean
-}
-
-interface EmailAttachment {
-  id: string
-  name: string
-  contentType: string
-  size: number
-}
-
-interface InvoiceData {
-  invoiceNumber: string | null
-  issueDate: string | null
-  dueDate: string | null
-  supplierName: string | null
-  supplierICO: string | null
-  supplierDIC: string | null
-  totalAmount: number | null
-  amountWithoutVAT: number | null
-  vatAmount: number | null
-  variableSymbol: string | null
-  currency: string | null
-  bankAccount: string | null
-  fromCache?: boolean
-}
+import { useAuth } from '@/hooks/useAuth'
+import { useEmails, type EmailMessage } from '@/hooks/useEmails'
+import { useAttachments, type EmailAttachment, type InvoiceData } from '@/hooks/useAttachments'
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [emails, setEmails] = useState<EmailMessage[]>([])
-  const [selectedEmail, setSelectedEmail] = useState<string | null>(null)
-  const [attachments, setAttachments] = useState<EmailAttachment[]>([])
-  const [allAttachments, setAllAttachments] = useState<Record<string, EmailAttachment[]>>({})
-  const [selectedAttachment, setSelectedAttachment] = useState<string | null>(null)
-  const [loadingEmails, setLoadingEmails] = useState(false)
-  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null)
-  const [extractingAttachmentId, setExtractingAttachmentId] = useState<string | null>(null)
-  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null)
-  const [syncing, setSyncing] = useState(false)
+  // Custom hooks
+  const auth = useAuth()
+  const emails = useEmails()
+  const attachments = useAttachments()
 
+  // Fetch emails and sync status when authenticated
   useEffect(() => {
-    checkAuthStatus()
-
-    // Listen for OAuth callback from popup
-    const handleMessage = (event: MessageEvent) => {
-      // SECURITY: Validate origin before processing
-      const allowedOrigins = [BACKEND_URL, FRONTEND_URL]
-      if (!allowedOrigins.includes(event.origin)) {
-        console.warn(`Rejected message from unauthorized origin: ${event.origin}`)
-        return
-      }
-
-      if (event.data.type === 'AUTH_SUCCESS') {
-        console.log('Authentication successful!')
-        checkAuthStatus()
-      } else if (event.data.type === 'AUTH_ERROR') {
-        setError('Authentication failed. Please try again.')
-      }
+    if (auth.isAuthenticated) {
+      emails.fetchEmails(attachments.fetchBatchAttachments)
+      emails.fetchSyncStatus()
     }
+  }, [auth.isAuthenticated])
 
-    window.addEventListener('message', handleMessage)
-    return () => window.removeEventListener('message', handleMessage)
-  }, [])
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchEmails()
-      fetchSyncStatus()
-    }
-  }, [isAuthenticated])
-
-  const checkAuthStatus = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch('/api/auth/status', {
-        credentials: 'include',
-      })
-      const data = await response.json()
-      setIsAuthenticated(data.isAuthenticated)
-    } catch (err) {
-      console.error('Error checking auth status:', err)
-      setError('Failed to check authentication status')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleLogin = async () => {
-    setError(null)
-    setLoading(true)
-
-    try {
-      // Get auth URL from backend
-      const response = await fetch('/api/auth/login')
-      const data = await response.json()
-
-      if (data.authUrl) {
-        // Open popup window for OAuth
-        const width = 600
-        const height = 700
-        const left = window.screen.width / 2 - width / 2
-        const top = window.screen.height / 2 - height / 2
-
-        window.open(
-          data.authUrl,
-          'Microsoft Login',
-          `width=${width},height=${height},left=${left},top=${top}`
-        )
-      }
-    } catch (err) {
-      console.error('Login error:', err)
-      setError('Failed to initiate login')
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // Wrapper functions for hooks
   const handleLogout = async () => {
-    setLoading(true)
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      })
-      setIsAuthenticated(false)
-      setEmails([])
-      setSelectedEmail(null)
-      setAttachments([])
-      setSelectedAttachment(null)
-      setInvoiceData(null)
-    } catch (err) {
-      console.error('Logout error:', err)
-      setError('Failed to log out')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchEmails = async () => {
-    setLoadingEmails(true)
-    setError(null)
-    try {
-      const response = await fetch('/api/emails/faktury', {
-        credentials: 'include',
-      })
-      if (!response.ok) {
-        throw new Error('Failed to fetch emails')
-      }
-      const data = await response.json()
-      setEmails(data)
-
-      // Batch fetch attachments for all emails with attachments (fixes N+1 query)
-      const emailsWithAttachments = data.filter((email: EmailMessage) => email.hasAttachments)
-      if (emailsWithAttachments.length > 0) {
-        fetchBatchAttachments(emailsWithAttachments.map((e: EmailMessage) => e.id))
-      }
-    } catch (err) {
-      console.error('Error fetching emails:', err)
-      setError('Failed to fetch emails from faktury folder')
-    } finally {
-      setLoadingEmails(false)
-    }
-  }
-
-  const fetchBatchAttachments = async (messageIds: string[]) => {
-    try {
-      const response = await fetch('/api/emails/attachments/batch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ messageIds }),
-      })
-      if (!response.ok) {
-        throw new Error('Failed to batch fetch attachments')
-      }
-      const batchData = await response.json()
-      setAllAttachments(batchData)
-    } catch (err) {
-      console.error('Error batch fetching attachments:', err)
-      // Don't set error - attachments will be fetched individually on demand
-    }
-  }
-
-  const fetchAttachments = async (messageId: string) => {
-    // Try to use cached batch data first
-    if (allAttachments[messageId]) {
-      const data = allAttachments[messageId]
-      setAttachments(data)
-      setSelectedEmail(messageId)
-
-      // Automatically select and extract first attachment
-      if (data.length > 0) {
-        const firstAttachment = data[0]
-        setSelectedAttachment(firstAttachment.id)
-        // Auto-extract for first attachment
-        extractInvoiceData(messageId, firstAttachment.id)
-      }
-      return
-    }
-
-    // Fallback to individual fetch if not in cache
-    try {
-      const response = await fetch(`/api/emails/${messageId}/attachments`, {
-        credentials: 'include',
-      })
-      if (!response.ok) {
-        throw new Error('Failed to fetch attachments')
-      }
-      const data = await response.json()
-      setAttachments(data)
-      setSelectedEmail(messageId)
-
-      // Cache the result
-      setAllAttachments((prev) => ({ ...prev, [messageId]: data }))
-
-      // Automatically select and extract first attachment
-      if (data.length > 0) {
-        const firstAttachment = data[0]
-        setSelectedAttachment(firstAttachment.id)
-        // Auto-extract for first attachment
-        extractInvoiceData(messageId, firstAttachment.id)
-      }
-    } catch (err) {
-      console.error('Error fetching attachments:', err)
-      setError('Failed to fetch attachments')
-    }
-  }
-
-  const selectAttachment = (attachmentId: string) => {
-    setSelectedAttachment(attachmentId)
-    if (selectedEmail) {
-      extractInvoiceData(selectedEmail, attachmentId)
-    }
-  }
-
-  const extractInvoiceData = async (messageId: string, attachmentId: string, regenerate = false) => {
-    setExtractingAttachmentId(attachmentId)
-    setError(null)
-    try {
-      const url = `/api/emails/${messageId}/attachments/${attachmentId}/extract${regenerate ? '?regenerate=true' : ''}`
-      const response = await fetch(url, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      if (!response.ok) {
-        throw new Error('Failed to extract invoice data')
-      }
-      const data = await response.json()
-      setInvoiceData(data)
-    } catch (err) {
-      console.error('Error extracting invoice data:', err)
-      setError('Failed to extract invoice data from PDF')
-    } finally {
-      setExtractingAttachmentId(null)
-    }
-  }
-
-  const fetchSyncStatus = async () => {
-    try {
-      const response = await fetch('/api/emails/sync/status', {
-        credentials: 'include',
-      })
-      if (!response.ok) {
-        throw new Error('Failed to fetch sync status')
-      }
-      const data = await response.json()
-      setLastSyncTime(data.lastSyncTimestamp)
-    } catch (err) {
-      console.error('Error fetching sync status:', err)
-    }
+    await auth.logout()
+    attachments.reset()
   }
 
   const handleSync = async () => {
-    setSyncing(true)
-    setError(null)
-    try {
-      const response = await fetch('/api/emails/sync', {
-        method: 'POST',
-        credentials: 'include',
-      })
-      if (!response.ok) {
-        throw new Error('Failed to sync emails')
-      }
-      const result = await response.json()
-      setLastSyncTime(result.timestamp)
-
-      // Refresh emails after sync
-      await fetchEmails()
-
-      if (result.newInvoices > 0) {
-        console.log(`Sync completed: ${result.newInvoices} new invoices found`)
-      }
-    } catch (err) {
-      console.error('Error syncing emails:', err)
-      setError('Failed to sync emails')
-    } finally {
-      setSyncing(false)
-    }
+    await emails.sync(() => emails.fetchEmails(attachments.fetchBatchAttachments))
   }
+
+  // Combined error from all hooks
+  const error = auth.error || emails.error || attachments.error
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-8">
@@ -322,7 +42,7 @@ function App() {
             <FileText className="w-8 h-8 text-blue-600" />
             <h1 className="text-3xl font-bold">Invoice Manager</h1>
           </div>
-          {isAuthenticated && (
+          {auth.isAuthenticated && (
             <Button onClick={handleLogout} variant="outline" size="sm">
               <LogOut className="w-4 h-4 mr-2" />
               Logout
@@ -338,7 +58,7 @@ function App() {
         )}
 
         {/* Login screen */}
-        {!isAuthenticated ? (
+        {!auth.isAuthenticated ? (
           <Card className="max-w-md mx-auto">
             <CardHeader>
               <CardTitle className="text-2xl flex items-center gap-2">
@@ -351,13 +71,13 @@ function App() {
             </CardHeader>
             <CardContent>
               <Button
-                onClick={handleLogin}
-                disabled={loading}
+                onClick={auth.login}
+                disabled={auth.loading}
                 className="w-full"
                 size="lg"
               >
                 <Mail className="w-4 h-4 mr-2" />
-                {loading ? 'Connecting...' : 'Connect Outlook Account'}
+                {auth.loading ? 'Connecting...' : 'Connect Outlook Account'}
               </Button>
             </CardContent>
           </Card>
@@ -371,42 +91,42 @@ function App() {
                   <div className="flex items-center justify-between">
                     <CardTitle>Invoices from "faktury" folder</CardTitle>
                     <div className="flex gap-2">
-                      <Button onClick={handleSync} disabled={syncing} size="sm" variant="outline">
+                      <Button onClick={handleSync} disabled={emails.syncing} size="sm" variant="outline">
                         <Cloud className="w-4 h-4 mr-2" />
-                        {syncing ? 'Syncing...' : 'Sync'}
+                        {emails.syncing ? 'Syncing...' : 'Sync'}
                       </Button>
-                      <Button onClick={fetchEmails} disabled={loadingEmails} size="sm" variant="outline">
+                      <Button onClick={() => emails.fetchEmails(attachments.fetchBatchAttachments)} disabled={emails.loadingEmails} size="sm" variant="outline">
                         <RefreshCw className="w-4 h-4 mr-2" />
-                        {loadingEmails ? 'Loading...' : 'Refresh'}
+                        {emails.loadingEmails ? 'Loading...' : 'Refresh'}
                       </Button>
                     </div>
                   </div>
                   <CardDescription>
-                    {emails.length} emails found
-                    {lastSyncTime && (
+                    {emails.emails.length} emails found
+                    {emails.lastSyncTime && (
                       <span className="ml-2 text-xs text-muted-foreground">
-                        • Last sync: {new Date(lastSyncTime).toLocaleString('cs-CZ')}
+                        • Last sync: {new Date(emails.lastSyncTime).toLocaleString('cs-CZ')}
                       </span>
                     )}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {loadingEmails ? (
+                  {emails.loadingEmails ? (
                     <div className="text-center py-8 text-muted-foreground">
                       Loading emails...
                     </div>
-                  ) : emails.length === 0 ? (
+                  ) : emails.emails.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       No emails found in "faktury" folder
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                      {emails.map((email) => (
+                      {emails.emails.map((email) => (
                         <div
                           key={email.id}
-                          onClick={() => fetchAttachments(email.id)}
+                          onClick={() => attachments.fetchAttachments(email.id, attachments.extractInvoiceData)}
                           className={`p-4 rounded-lg border cursor-pointer transition-colors hover:bg-accent ${
-                            selectedEmail === email.id ? 'border-blue-500 bg-accent' : ''
+                            attachments.selectedEmail === email.id ? 'border-blue-500 bg-accent' : ''
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -440,26 +160,26 @@ function App() {
                 <CardHeader>
                   <CardTitle>PDF Attachments</CardTitle>
                   <CardDescription>
-                    {selectedEmail ? 'Select an attachment to view' : 'Select an email to view attachments'}
+                    {attachments.selectedEmail ? 'Select an attachment to view' : 'Select an email to view attachments'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {!selectedEmail ? (
+                  {!attachments.selectedEmail ? (
                     <div className="text-center py-8 text-muted-foreground">
                       Select an email from the list
                     </div>
-                  ) : attachments.length === 0 ? (
+                  ) : attachments.attachments.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       No PDF attachments found
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                      {attachments.map((attachment) => (
+                      {attachments.attachments.map((attachment) => (
                         <div
                           key={attachment.id}
-                          onClick={() => selectAttachment(attachment.id)}
+                          onClick={() => attachments.selectAttachment(attachment.id, attachments.selectedEmail!, attachments.extractInvoiceData)}
                           className={`p-4 rounded-lg border cursor-pointer transition-colors hover:bg-accent ${
-                            selectedAttachment === attachment.id ? 'border-blue-500 bg-accent' : ''
+                            attachments.selectedAttachment === attachment.id ? 'border-blue-500 bg-accent' : ''
                           }`}
                         >
                           <div className="flex items-center gap-3">
@@ -470,7 +190,7 @@ function App() {
                                 {(attachment.size / 1024).toFixed(1)} KB
                               </p>
                             </div>
-                            {extractingAttachmentId === attachment.id && (
+                            {attachments.extractingAttachmentId === attachment.id && (
                               <div className="text-blue-600 text-sm">Extracting...</div>
                             )}
                           </div>
@@ -483,7 +203,7 @@ function App() {
             </div>
 
             {/* Bottom Section: PDF Preview and Extracted Data */}
-            {selectedEmail && selectedAttachment && (
+            {attachments.selectedEmail && attachments.selectedAttachment && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* PDF Preview */}
                 <Card className="h-[600px]">
@@ -492,7 +212,7 @@ function App() {
                   </CardHeader>
                   <CardContent className="h-[calc(100%-5rem)]">
                     <iframe
-                      src={`/api/emails/${selectedEmail}/attachments/${selectedAttachment}`}
+                      src={`/api/emails/${attachments.selectedEmail}/attachments/${attachments.selectedAttachment}`}
                       className="w-full h-full border rounded"
                       title="PDF Preview"
                     />
@@ -505,9 +225,9 @@ function App() {
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle>Extracted Invoice Data</CardTitle>
-                        {invoiceData && (
+                        {attachments.invoiceData && (
                           <CardDescription className="flex items-center gap-2 mt-1">
-                            {invoiceData.fromCache ? (
+                            {attachments.invoiceData.fromCache ? (
                               <>
                                 <Database className="w-4 h-4 text-green-600" />
                                 <span>Loaded from database (cached)</span>
@@ -521,12 +241,12 @@ function App() {
                           </CardDescription>
                         )}
                       </div>
-                      {invoiceData && (
+                      {attachments.invoiceData && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => extractInvoiceData(selectedEmail, selectedAttachment, true)}
-                          disabled={extractingAttachmentId === selectedAttachment}
+                          onClick={() => attachments.extractInvoiceData(attachments.selectedEmail!, attachments.selectedAttachment!, true)}
+                          disabled={attachments.extractingAttachmentId === attachments.selectedAttachment}
                         >
                           <RefreshCw className="w-4 h-4 mr-2" />
                           Regenerate
@@ -535,75 +255,75 @@ function App() {
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 overflow-y-auto">
-                    {extractingAttachmentId === selectedAttachment ? (
+                    {attachments.extractingAttachmentId === attachments.selectedAttachment ? (
                       <div className="flex items-center justify-center h-full">
                         <div className="text-center">
                           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                           <p className="text-sm font-medium">Extracting invoice data...</p>
                         </div>
                       </div>
-                    ) : invoiceData ? (
+                    ) : attachments.invoiceData ? (
                       <table className="w-full border-collapse">
                         <tbody>
                           <tr className="border-b">
                             <td className="py-3 px-4 font-semibold bg-muted/50">Invoice Number</td>
-                            <td className="py-3 px-4">{invoiceData.invoiceNumber || '-'}</td>
+                            <td className="py-3 px-4">{attachments.invoiceData.invoiceNumber || '-'}</td>
                           </tr>
                           <tr className="border-b">
                             <td className="py-3 px-4 font-semibold bg-muted/50">Issue Date</td>
-                            <td className="py-3 px-4">{invoiceData.issueDate || '-'}</td>
+                            <td className="py-3 px-4">{attachments.invoiceData.issueDate || '-'}</td>
                           </tr>
                           <tr className="border-b">
                             <td className="py-3 px-4 font-semibold bg-muted/50">Due Date</td>
-                            <td className="py-3 px-4">{invoiceData.dueDate || '-'}</td>
+                            <td className="py-3 px-4">{attachments.invoiceData.dueDate || '-'}</td>
                           </tr>
                           <tr className="border-b">
                             <td className="py-3 px-4 font-semibold bg-muted/50">Supplier Name</td>
-                            <td className="py-3 px-4">{invoiceData.supplierName || '-'}</td>
+                            <td className="py-3 px-4">{attachments.invoiceData.supplierName || '-'}</td>
                           </tr>
                           <tr className="border-b">
                             <td className="py-3 px-4 font-semibold bg-muted/50">Supplier IČO</td>
-                            <td className="py-3 px-4">{invoiceData.supplierICO || '-'}</td>
+                            <td className="py-3 px-4">{attachments.invoiceData.supplierICO || '-'}</td>
                           </tr>
                           <tr className="border-b">
                             <td className="py-3 px-4 font-semibold bg-muted/50">Supplier DIČ</td>
-                            <td className="py-3 px-4">{invoiceData.supplierDIC || '-'}</td>
+                            <td className="py-3 px-4">{attachments.invoiceData.supplierDIC || '-'}</td>
                           </tr>
                           <tr className="border-b">
                             <td className="py-3 px-4 font-semibold bg-muted/50">Total Amount (incl. VAT)</td>
                             <td className="py-3 px-4">
-                              {invoiceData.totalAmount !== null
-                                ? `${invoiceData.totalAmount.toLocaleString()} ${invoiceData.currency || ''}`
+                              {attachments.invoiceData.totalAmount !== null
+                                ? `${attachments.invoiceData.totalAmount.toLocaleString()} ${attachments.invoiceData.currency || ''}`
                                 : '-'}
                             </td>
                           </tr>
                           <tr className="border-b">
                             <td className="py-3 px-4 font-semibold bg-muted/50">Amount without VAT</td>
                             <td className="py-3 px-4">
-                              {invoiceData.amountWithoutVAT !== null
-                                ? `${invoiceData.amountWithoutVAT.toLocaleString()} ${invoiceData.currency || ''}`
+                              {attachments.invoiceData.amountWithoutVAT !== null
+                                ? `${attachments.invoiceData.amountWithoutVAT.toLocaleString()} ${attachments.invoiceData.currency || ''}`
                                 : '-'}
                             </td>
                           </tr>
                           <tr className="border-b">
                             <td className="py-3 px-4 font-semibold bg-muted/50">VAT Amount</td>
                             <td className="py-3 px-4">
-                              {invoiceData.vatAmount !== null
-                                ? `${invoiceData.vatAmount.toLocaleString()} ${invoiceData.currency || ''}`
+                              {attachments.invoiceData.vatAmount !== null
+                                ? `${attachments.invoiceData.vatAmount.toLocaleString()} ${attachments.invoiceData.currency || ''}`
                                 : '-'}
                             </td>
                           </tr>
                           <tr className="border-b">
                             <td className="py-3 px-4 font-semibold bg-muted/50">Variable Symbol</td>
-                            <td className="py-3 px-4">{invoiceData.variableSymbol || '-'}</td>
+                            <td className="py-3 px-4">{attachments.invoiceData.variableSymbol || '-'}</td>
                           </tr>
                           <tr className="border-b">
                             <td className="py-3 px-4 font-semibold bg-muted/50">Currency</td>
-                            <td className="py-3 px-4">{invoiceData.currency || '-'}</td>
+                            <td className="py-3 px-4">{attachments.invoiceData.currency || '-'}</td>
                           </tr>
                           <tr>
                             <td className="py-3 px-4 font-semibold bg-muted/50">Bank Account</td>
-                            <td className="py-3 px-4">{invoiceData.bankAccount || '-'}</td>
+                            <td className="py-3 px-4">{attachments.invoiceData.bankAccount || '-'}</td>
                           </tr>
                         </tbody>
                       </table>
