@@ -35,6 +35,7 @@ class SyncService {
       this.isInitialized = true
 
       let extractedCount = 0
+      const newlyExtractedInvoices: Array<{ messageId: string, attachmentId: string, invoiceData: any, emailSubject: string }> = []
 
       // Auto-extract invoices from new emails if enabled
       if (autoExtract && newEmails.length > 0) {
@@ -53,8 +54,9 @@ class SyncService {
             // Extract each PDF attachment
             for (const attachment of pdfAttachments) {
               try {
-                // Skip if already extracted
-                if (databaseService.getInvoiceData(email.id, attachment.id)) {
+                // Check if already extracted BEFORE this sync run
+                const existingInvoice = databaseService.getInvoiceData(email.id, attachment.id)
+                if (existingInvoice) {
                   console.log(`Skipping already extracted invoice: ${attachment.name}`)
                   continue
                 }
@@ -75,13 +77,13 @@ class SyncService {
                 extractedCount++
                 console.log(`Successfully extracted invoice #${invoiceData.invoiceNumber}`)
 
-                // Send Discord notification
-                await discordNotificationService.notifyNewInvoice(
-                  email.id,
-                  attachment.id,
+                // Track newly extracted invoice for Discord notification
+                newlyExtractedInvoices.push({
+                  messageId: email.id,
+                  attachmentId: attachment.id,
                   invoiceData,
-                  email.subject
-                )
+                  emailSubject: email.subject
+                })
               } catch (attachError) {
                 console.error(`Error extracting attachment ${attachment.name}:`, attachError)
                 // Continue with next attachment
@@ -91,6 +93,21 @@ class SyncService {
             console.error(`Error processing email ${email.id}:`, emailError)
             // Continue with next email
           }
+        }
+      }
+
+      // Send Discord notifications for newly extracted invoices
+      for (const invoice of newlyExtractedInvoices) {
+        try {
+          await discordNotificationService.notifyNewInvoice(
+            invoice.messageId,
+            invoice.attachmentId,
+            invoice.invoiceData,
+            invoice.emailSubject
+          )
+        } catch (notificationError) {
+          console.error(`Failed to send Discord notification for invoice ${invoice.invoiceData.invoiceNumber}:`, notificationError)
+          // Don't fail the whole sync if notification fails
         }
       }
 
