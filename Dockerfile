@@ -77,7 +77,9 @@ VOLUME ["/app/data", "/app/logs"]
 EXPOSE 80
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+# Increased start-period to 60s to give backend time to fully start
+# Increased timeout to 10s for more reliable checks
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:80/api/health || exit 1
 
 # Start supervisord (runs nginx + node backend)
