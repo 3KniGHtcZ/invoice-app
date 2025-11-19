@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/requireAuth'
 import { invoiceExtractionService } from '../services/invoiceExtractionService'
 import { databaseService } from '../services/databaseService'
 import { syncService } from '../services/syncService'
+import { backgroundJobService } from '../services/backgroundJobService'
 import { cachePresets } from '../middleware/cacheControl'
 
 const router = Router()
@@ -11,7 +12,7 @@ const router = Router()
 // List all folders
 router.get('/folders', requireAuth, cachePresets.mediumCache, async (req: Request, res: Response) => {
   try {
-    const accessToken = req.session.accessToken!
+    const accessToken = req.accessToken!
     const folders = await graphService.listAllFolders(accessToken)
     res.json(folders)
   } catch (error) {
@@ -23,7 +24,7 @@ router.get('/folders', requireAuth, cachePresets.mediumCache, async (req: Reques
 // Get emails from 'faktury' folder
 router.get('/faktury', requireAuth, cachePresets.shortCache, async (req: Request, res: Response) => {
   try {
-    const accessToken = req.session.accessToken!
+    const accessToken = req.accessToken!
     const emails = await graphService.getEmailsFromFolder(accessToken, 'faktury')
 
     // Add extraction status to each email
@@ -53,7 +54,7 @@ router.post('/attachments/batch', requireAuth, cachePresets.mediumCache, async (
       return res.status(400).json({ error: 'Maximum 50 message IDs allowed per batch request' })
     }
 
-    const accessToken = req.session.accessToken!
+    const accessToken = req.accessToken!
     const batchAttachments = await graphService.getBatchEmailAttachments(accessToken, messageIds)
     res.json(batchAttachments)
   } catch (error) {
@@ -66,7 +67,7 @@ router.post('/attachments/batch', requireAuth, cachePresets.mediumCache, async (
 router.get('/:messageId/attachments', requireAuth, cachePresets.mediumCache, async (req: Request, res: Response) => {
   try {
     const { messageId } = req.params
-    const accessToken = req.session.accessToken!
+    const accessToken = req.accessToken!
     const attachments = await graphService.getEmailAttachments(accessToken, messageId)
     res.json(attachments)
   } catch (error) {
@@ -82,7 +83,7 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       const { messageId, attachmentId } = req.params
-      const accessToken = req.session.accessToken!
+      const accessToken = req.accessToken!
       const contentBytes = await graphService.getAttachmentContent(
         accessToken,
         messageId,
@@ -108,7 +109,7 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const { messageId, attachmentId } = req.params
-      const accessToken = req.session.accessToken!
+      const accessToken = req.accessToken!
       const regenerate = req.query.regenerate === 'true'
 
       // Try to get from database first (unless regenerate is requested)
@@ -160,12 +161,67 @@ router.get('/sync/status', requireAuth, async (req: Request, res: Response) => {
 // Trigger manual sync
 router.post('/sync', requireAuth, async (req: Request, res: Response) => {
   try {
-    const accessToken = req.session.accessToken!
+    const accessToken = req.accessToken!
     const result = await syncService.syncEmails(accessToken)
     res.json(result)
   } catch (error) {
     console.error('Error syncing emails:', error)
     res.status(500).json({ error: 'Failed to sync emails' })
+  }
+})
+
+// Get background job state
+router.get('/job/state', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const jobState = databaseService.getJobState()
+    if (!jobState) {
+      return res.json({
+        jobName: 'email_check',
+        lastRunTimestamp: null,
+        lastRunDurationMs: null,
+        lastStatus: 'idle',
+        lastError: null,
+        newInvoicesCount: 0,
+        totalInvoicesCount: 0,
+        consecutiveErrors: 0,
+        nextScheduledRun: null
+      })
+    }
+    res.json(jobState)
+  } catch (error) {
+    console.error('Error getting job state:', error)
+    res.status(500).json({ error: 'Failed to get job state' })
+  }
+})
+
+// Manually trigger background job
+router.post('/job/trigger', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (backgroundJobService.isJobRunning()) {
+      return res.status(409).json({ error: 'Job is already running' })
+    }
+
+    // Run job in background (don't await)
+    backgroundJobService.checkEmails().catch(err => {
+      console.error('Manual job trigger error:', err)
+    })
+
+    res.json({ success: true, message: 'Job triggered' })
+  } catch (error) {
+    console.error('Error triggering job:', error)
+    res.status(500).json({ error: 'Failed to trigger job' })
+  }
+})
+
+// Get job execution history (optional, for monitoring)
+router.get('/job/history', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 10
+    const history = databaseService.getRecentJobHistory(limit)
+    res.json(history)
+  } catch (error) {
+    console.error('Error getting job history:', error)
+    res.status(500).json({ error: 'Failed to get job history' })
   }
 })
 

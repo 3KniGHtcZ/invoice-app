@@ -1,4 +1,4 @@
-import { ConfidentialClientApplication, AuthorizationUrlRequest, AuthorizationCodeRequest } from '@azure/msal-node'
+import { ConfidentialClientApplication, AuthorizationUrlRequest, AuthorizationCodeRequest, AccountInfo } from '@azure/msal-node'
 import { msalConfig, REDIRECT_URI, SCOPES } from '../config/msalConfig.js'
 
 class AuthService {
@@ -33,6 +33,7 @@ class AuthService {
     accessToken: string
     refreshToken: string | undefined
     expiresOn: Date | null
+    account: AccountInfo | null
   }> {
     const tokenRequest: AuthorizationCodeRequest = {
       code,
@@ -47,6 +48,7 @@ class AuthService {
         accessToken: response.accessToken,
         refreshToken: response.refreshToken,
         expiresOn: response.expiresOn,
+        account: response.account,
       }
     } catch (error) {
       console.error('Error acquiring token by code:', error)

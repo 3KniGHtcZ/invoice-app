@@ -1,34 +1,28 @@
 import { Request, Response, NextFunction } from 'express'
-import { authService } from '../services/authService.js'
+import { tokenManagerService } from '../services/tokenManagerService.js'
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const session = req.session
 
-  if (!session.accessToken) {
+  // Check if user has a valid session
+  if (!session.userId || !session.isAuthenticated) {
     return res.status(401).json({ error: 'Not authenticated' })
   }
 
-  // Check if token is expired
-  if (session.tokenExpiresAt && Date.now() >= session.tokenExpiresAt) {
-    // Try to refresh token
-    if (session.refreshToken) {
-      try {
-        const tokens = await authService.refreshAccessToken(session.refreshToken)
+  try {
+    // Get valid access token from database (auto-refreshes if needed)
+    const accessToken = await tokenManagerService.getValidAccessToken()
 
-        // Update session with new tokens
-        session.accessToken = tokens.accessToken
-        session.refreshToken = tokens.refreshToken
-        session.tokenExpiresAt = tokens.expiresOn ? tokens.expiresOn.getTime() : undefined
-
-        return next()
-      } catch (error) {
-        console.error('Token refresh failed:', error)
-        return res.status(401).json({ error: 'Session expired. Please log in again.' })
-      }
-    } else {
+    if (!accessToken) {
       return res.status(401).json({ error: 'Session expired. Please log in again.' })
     }
-  }
 
-  next()
+    // Store access token in request for use by route handlers
+    req.accessToken = accessToken
+
+    next()
+  } catch (error) {
+    console.error('Authentication error:', error)
+    return res.status(401).json({ error: 'Authentication failed. Please log in again.' })
+  }
 }

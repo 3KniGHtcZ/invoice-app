@@ -1,16 +1,18 @@
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Mail, FileText, Paperclip, LogOut, Sparkles, RefreshCw, Database, CheckCircle2, Cloud } from 'lucide-react'
+import { Mail, FileText, Paperclip, LogOut, Sparkles, RefreshCw, Database, CheckCircle2, Cloud, Clock, AlertCircle, Play } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useEmails } from '@/hooks/useEmails'
 import { useAttachments } from '@/hooks/useAttachments'
+import { useJobStatus } from '@/hooks/useJobStatus'
 
 function App() {
   // Custom hooks
   const auth = useAuth()
   const emails = useEmails()
   const attachments = useAttachments()
+  const jobStatus = useJobStatus()
 
   // Fetch emails and sync status when authenticated
   useEffect(() => {
@@ -54,6 +56,91 @@ function App() {
         {error && (
           <div className="mb-6 p-4 rounded-lg bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 text-sm">
             {error}
+          </div>
+        )}
+
+        {/* Background Job Status Badge */}
+        {auth.isAuthenticated && jobStatus.jobState && (
+          <div className="mb-6 p-4 rounded-lg border bg-card">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 flex-1">
+                {/* Status Indicator */}
+                <div className="flex items-center gap-2">
+                  {jobStatus.jobState.lastStatus === 'running' && (
+                    <>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                      <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Running</span>
+                    </>
+                  )}
+                  {jobStatus.jobState.lastStatus === 'success' && (
+                    <>
+                      <div className="w-2 h-2 bg-green-500 rounded-full" />
+                      <span className="text-sm font-medium text-green-600 dark:text-green-400">Success</span>
+                    </>
+                  )}
+                  {jobStatus.jobState.lastStatus === 'error' && (
+                    <>
+                      <AlertCircle className="w-4 h-4 text-red-500" />
+                      <span className="text-sm font-medium text-red-600 dark:text-red-400">Error</span>
+                    </>
+                  )}
+                  {jobStatus.jobState.lastStatus === 'idle' && (
+                    <>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                      <span className="text-sm font-medium text-muted-foreground">Idle</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Last Run Info */}
+                {jobStatus.jobState.lastRunTimestamp && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="w-4 h-4" />
+                    <span>
+                      Last check: {new Date(jobStatus.jobState.lastRunTimestamp).toLocaleString('cs-CZ')}
+                    </span>
+                  </div>
+                )}
+
+                {/* New Invoices Count */}
+                {jobStatus.jobState.lastStatus === 'success' && jobStatus.jobState.newInvoicesCount > 0 && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    <span className="font-medium text-green-600 dark:text-green-400">
+                      {jobStatus.jobState.newInvoicesCount} new invoice{jobStatus.jobState.newInvoicesCount !== 1 ? 's' : ''} extracted
+                    </span>
+                  </div>
+                )}
+
+                {/* Error Message */}
+                {jobStatus.jobState.lastStatus === 'error' && jobStatus.jobState.lastError && (
+                  <div className="text-sm text-red-600 dark:text-red-400">
+                    {jobStatus.jobState.lastError}
+                  </div>
+                )}
+              </div>
+
+              {/* Manual Trigger Button */}
+              <Button
+                onClick={async () => {
+                  try {
+                    await jobStatus.triggerJob()
+                    // Refresh email list after job completes
+                    setTimeout(() => {
+                      emails.fetchEmails(attachments.fetchBatchAttachments)
+                    }, 2000)
+                  } catch (err) {
+                    console.error('Failed to trigger job:', err)
+                  }
+                }}
+                disabled={jobStatus.jobState.lastStatus === 'running'}
+                size="sm"
+                variant="outline"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                {jobStatus.jobState.lastStatus === 'running' ? 'Running...' : 'Check Now'}
+              </Button>
+            </div>
           </div>
         )}
 

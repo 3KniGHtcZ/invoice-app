@@ -17,6 +17,30 @@ export interface AuthTokens {
   expiresAt: string
 }
 
+export interface JobState {
+  jobName: string
+  lastRunTimestamp: string | null
+  lastRunDurationMs: number | null
+  lastStatus: 'idle' | 'running' | 'success' | 'error'
+  lastError: string | null
+  newInvoicesCount: number
+  totalInvoicesCount: number
+  consecutiveErrors: number
+  nextScheduledRun: string | null
+}
+
+export interface JobExecution {
+  id: number
+  jobName: string
+  startedAt: string
+  completedAt: string | null
+  status: string
+  error: string | null
+  newInvoicesCount: number
+  totalInvoicesCount: number
+  durationMs: number | null
+}
+
 class DatabaseService {
   private db: Database.Database
 
@@ -114,6 +138,51 @@ class DatabaseService {
       // Migration already done or error - continue
       console.log('Auth tokens table migration check:', err)
     }
+
+    // Create background job state table
+    this.db.prepare(`
+      CREATE TABLE IF NOT EXISTS background_job_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        job_name TEXT NOT NULL DEFAULT 'email_check',
+        last_run_timestamp DATETIME,
+        last_run_duration_ms INTEGER,
+        last_status TEXT DEFAULT 'idle',
+        last_error TEXT,
+        new_invoices_count INTEGER DEFAULT 0,
+        total_invoices_count INTEGER DEFAULT 0,
+        consecutive_errors INTEGER DEFAULT 0,
+        next_scheduled_run DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+
+    // Initialize with default values if empty
+    this.db.prepare(`
+      INSERT OR IGNORE INTO background_job_state (id, job_name)
+      VALUES (1, 'email_check')
+    `).run()
+
+    // Create job execution history table
+    this.db.prepare(`
+      CREATE TABLE IF NOT EXISTS job_execution_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_name TEXT NOT NULL,
+        started_at DATETIME NOT NULL,
+        completed_at DATETIME,
+        status TEXT NOT NULL,
+        error TEXT,
+        new_invoices_count INTEGER DEFAULT 0,
+        total_invoices_count INTEGER DEFAULT 0,
+        duration_ms INTEGER
+      )
+    `).run()
+
+    // Create index for history queries
+    this.db.prepare(`
+      CREATE INDEX IF NOT EXISTS idx_job_history_started
+      ON job_execution_history(started_at DESC)
+    `).run()
   }
 
   getInvoiceData(messageId: string, attachmentId: string): InvoiceData | null {
@@ -257,6 +326,114 @@ class DatabaseService {
       DELETE FROM auth_tokens WHERE id = 1
     `)
     stmt.run()
+  }
+
+  // Background job state management methods
+  getJobState(): JobState | null {
+    const stmt = this.db.prepare(`
+      SELECT
+        job_name as jobName,
+        last_run_timestamp as lastRunTimestamp,
+        last_run_duration_ms as lastRunDurationMs,
+        last_status as lastStatus,
+        last_error as lastError,
+        new_invoices_count as newInvoicesCount,
+        total_invoices_count as totalInvoicesCount,
+        consecutive_errors as consecutiveErrors,
+        next_scheduled_run as nextScheduledRun
+      FROM background_job_state
+      WHERE id = 1
+    `)
+    const result = stmt.get() as JobState | undefined
+    return result || null
+  }
+
+  updateJobState(state: Partial<Omit<JobState, 'jobName'>>): void {
+    const fields: string[] = []
+    const values: any[] = []
+
+    if (state.lastRunTimestamp !== undefined) {
+      fields.push('last_run_timestamp = ?')
+      values.push(state.lastRunTimestamp)
+    }
+    if (state.lastRunDurationMs !== undefined) {
+      fields.push('last_run_duration_ms = ?')
+      values.push(state.lastRunDurationMs)
+    }
+    if (state.lastStatus !== undefined) {
+      fields.push('last_status = ?')
+      values.push(state.lastStatus)
+    }
+    if (state.lastError !== undefined) {
+      fields.push('last_error = ?')
+      values.push(state.lastError)
+    }
+    if (state.newInvoicesCount !== undefined) {
+      fields.push('new_invoices_count = ?')
+      values.push(state.newInvoicesCount)
+    }
+    if (state.totalInvoicesCount !== undefined) {
+      fields.push('total_invoices_count = ?')
+      values.push(state.totalInvoicesCount)
+    }
+    if (state.consecutiveErrors !== undefined) {
+      fields.push('consecutive_errors = ?')
+      values.push(state.consecutiveErrors)
+    }
+    if (state.nextScheduledRun !== undefined) {
+      fields.push('next_scheduled_run = ?')
+      values.push(state.nextScheduledRun)
+    }
+
+    if (fields.length > 0) {
+      fields.push('updated_at = CURRENT_TIMESTAMP')
+      const sql = `UPDATE background_job_state SET ${fields.join(', ')} WHERE id = 1`
+      this.db.prepare(sql).run(...values)
+    }
+  }
+
+  addJobExecution(execution: Omit<JobExecution, 'id'>): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO job_execution_history (
+        job_name,
+        started_at,
+        completed_at,
+        status,
+        error,
+        new_invoices_count,
+        total_invoices_count,
+        duration_ms
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    stmt.run(
+      execution.jobName,
+      execution.startedAt,
+      execution.completedAt,
+      execution.status,
+      execution.error,
+      execution.newInvoicesCount,
+      execution.totalInvoicesCount,
+      execution.durationMs
+    )
+  }
+
+  getRecentJobHistory(limit: number = 10): JobExecution[] {
+    const stmt = this.db.prepare(`
+      SELECT
+        id,
+        job_name as jobName,
+        started_at as startedAt,
+        completed_at as completedAt,
+        status,
+        error,
+        new_invoices_count as newInvoicesCount,
+        total_invoices_count as totalInvoicesCount,
+        duration_ms as durationMs
+      FROM job_execution_history
+      ORDER BY started_at DESC
+      LIMIT ?
+    `)
+    return stmt.all(limit) as JobExecution[]
   }
 
   close() {

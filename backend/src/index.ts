@@ -8,6 +8,7 @@ import authRoutes from './routes/authRoutes'
 import emailRoutes from './routes/emailRoutes'
 import { syncService } from './services/syncService'
 import { tokenManagerService } from './services/tokenManagerService'
+import { backgroundJobService } from './services/backgroundJobService'
 import './types/session.types'
 
 dotenv.config()
@@ -113,6 +114,9 @@ app.get('/api/health', (req: Request, res: Response) => {
 
 // Initialize sync service from database
 syncService.initializeFromDatabase()
+
+// Start background job for automatic email checking
+backgroundJobService.start()
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`)

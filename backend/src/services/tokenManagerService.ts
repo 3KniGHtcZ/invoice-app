@@ -60,13 +60,14 @@ class TokenManagerService {
     }
 
     console.log('Access token expired or expiring soon, refreshing...')
-    return await this.refreshAccessToken(tokens.refreshToken)
+    return await this.refreshAccessToken(tokens.refreshToken, tokens.userId)
   }
 
   /**
    * Refresh the access token using the refresh token
+   * @param userId User ID to use when saving refreshed tokens
    */
-  private async refreshAccessToken(refreshToken: string | null): Promise<string | null> {
+  private async refreshAccessToken(refreshToken: string | null, userId: string): Promise<string | null> {
     if (!refreshToken) {
       console.log('No refresh token provided')
       return null
@@ -86,9 +87,9 @@ class TokenManagerService {
       const response = await this.msalClient.acquireTokenByRefreshToken(refreshRequest)
 
       if (response) {
-        // Save the new tokens
+        // Save the new tokens using the provided userId
         await this.saveTokens(
-          response.account?.homeAccountId || 'default',
+          userId,
           response.accessToken,
           response.refreshToken || refreshToken, // Use old refresh token if new one not provided
           response.expiresOn ? Math.floor((response.expiresOn.getTime() - Date.now()) / 1000) : 3600

@@ -1,8 +1,10 @@
 import { graphService } from './graphService'
 import { databaseService } from './databaseService'
+import { invoiceExtractionService } from './invoiceExtractionService'
 
 interface SyncResult {
   success: boolean
+  newEmails: number
   newInvoices: number
   totalInvoices: number
   timestamp: string
@@ -14,7 +16,7 @@ class SyncService {
   private knownEmailIds: Set<string> = new Set()
   private isInitialized = false
 
-  async syncEmails(accessToken: string): Promise<SyncResult> {
+  async syncEmails(accessToken: string, autoExtract: boolean = false): Promise<SyncResult> {
     try {
       const startTime = new Date().toISOString()
 
@@ -31,6 +33,57 @@ class SyncService {
       this.knownEmailIds = currentEmailIds
       this.isInitialized = true
 
+      let extractedCount = 0
+
+      // Auto-extract invoices from new emails if enabled
+      if (autoExtract && newEmails.length > 0) {
+        console.log(`Auto-extracting invoices from ${newEmails.length} new emails...`)
+
+        for (const email of newEmails) {
+          try {
+            // Get attachments for this email
+            const attachments = await graphService.getEmailAttachments(accessToken, email.id)
+
+            // Filter PDF attachments
+            const pdfAttachments = attachments.filter((att: any) =>
+              att.contentType === 'application/pdf' || att.name?.toLowerCase().endsWith('.pdf')
+            )
+
+            // Extract each PDF attachment
+            for (const attachment of pdfAttachments) {
+              try {
+                // Skip if already extracted
+                if (databaseService.getInvoiceData(email.id, attachment.id)) {
+                  console.log(`Skipping already extracted invoice: ${attachment.name}`)
+                  continue
+                }
+
+                // Get PDF content
+                const contentBytes = await graphService.getAttachmentContent(
+                  accessToken,
+                  email.id,
+                  attachment.id
+                )
+
+                // Extract invoice data using AI
+                console.log(`Extracting invoice from: ${attachment.name}`)
+                const invoiceData = await invoiceExtractionService.extractInvoiceData(contentBytes)
+
+                // Save to database
+                databaseService.saveInvoiceData(email.id, attachment.id, invoiceData)
+                extractedCount++
+                console.log(`Successfully extracted invoice #${invoiceData.invoiceNumber}`)
+              } catch (attachError) {
+                console.error(`Error extracting attachment ${attachment.name}:`, attachError)
+                // Continue with next attachment
+              }
+            }
+          } catch (emailError) {
+            console.error(`Error processing email ${email.id}:`, emailError)
+            // Continue with next email
+          }
+        }
+      }
 
       // Update last sync timestamp
       this.lastSyncTimestamp = startTime
@@ -38,7 +91,8 @@ class SyncService {
 
       return {
         success: true,
-        newInvoices: newEmails.length,
+        newEmails: newEmails.length,
+        newInvoices: extractedCount,
         totalInvoices: emails.length,
         timestamp: startTime
       }
@@ -46,6 +100,7 @@ class SyncService {
       console.error('Error syncing emails:', error)
       return {
         success: false,
+        newEmails: 0,
         newInvoices: 0,
         totalInvoices: 0,
         timestamp: new Date().toISOString(),
