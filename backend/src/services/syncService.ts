@@ -1,6 +1,7 @@
 import { graphService } from './graphService'
 import { databaseService } from './databaseService'
 import { invoiceExtractionService } from './invoiceExtractionService'
+import { discordNotificationService } from './discordNotificationService'
 
 interface SyncResult {
   success: boolean
@@ -73,6 +74,14 @@ class SyncService {
                 databaseService.saveInvoiceData(email.id, attachment.id, invoiceData)
                 extractedCount++
                 console.log(`Successfully extracted invoice #${invoiceData.invoiceNumber}`)
+
+                // Send Discord notification
+                await discordNotificationService.notifyNewInvoice(
+                  email.id,
+                  attachment.id,
+                  invoiceData,
+                  email.subject
+                )
               } catch (attachError) {
                 console.error(`Error extracting attachment ${attachment.name}:`, attachError)
                 // Continue with next attachment
