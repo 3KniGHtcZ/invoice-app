@@ -113,6 +113,31 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// Version info
+app.get('/api/version', (req: Request, res: Response) => {
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    const buildInfoPath = path.join(__dirname, '../../build-info.json')
+
+    if (fs.existsSync(buildInfoPath)) {
+      const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf-8'))
+      res.json(buildInfo)
+    } else {
+      // Local development fallback
+      res.json({
+        buildDate: 'development',
+        gitCommit: 'local',
+        gitBranch: 'local',
+        version: 'dev'
+      })
+    }
+  } catch (error) {
+    console.error('Error reading build info:', error)
+    res.status(500).json({ error: 'Failed to read build information' })
+  }
+})
+
 // Initialize sync service from database
 syncService.initializeFromDatabase()
 

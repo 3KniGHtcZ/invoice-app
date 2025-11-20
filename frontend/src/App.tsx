@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Mail, FileText, Paperclip, LogOut, Sparkles, RefreshCw, Database, CheckCircle2, Cloud, Clock, AlertCircle, Play } from 'lucide-react'
+import { Mail, FileText, Paperclip, LogOut, Sparkles, RefreshCw, Database, CheckCircle2, Cloud, Clock, AlertCircle, Play, GitBranch, GitCommit } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useEmails } from '@/hooks/useEmails'
 import { useAttachments } from '@/hooks/useAttachments'
 import { useJobStatus } from '@/hooks/useJobStatus'
+import { useVersion } from '@/hooks/useVersion'
 
 function App() {
   // Custom hooks
@@ -13,6 +14,7 @@ function App() {
   const emails = useEmails()
   const attachments = useAttachments()
   const jobStatus = useJobStatus()
+  const versionInfo = useVersion()
 
   // Fetch emails and sync status when authenticated
   useEffect(() => {
@@ -423,6 +425,28 @@ function App() {
                 </Card>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Build Info Footer */}
+        {versionInfo && (
+          <div className="mt-8 pt-6 border-t border-border">
+            <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <GitBranch className="w-3 h-3" />
+                <span>{versionInfo.version}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <GitCommit className="w-3 h-3" />
+                <span title={versionInfo.gitCommit}>
+                  {versionInfo.gitCommit.substring(0, 7)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-3 h-3" />
+                <span>{new Date(versionInfo.buildDate).toLocaleString('cs-CZ')}</span>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -35,6 +35,12 @@ RUN yarn install --frozen-lockfile --production
 # =============================================================================
 FROM node:20-alpine
 
+# Build arguments for version information
+ARG BUILD_DATE
+ARG GIT_COMMIT
+ARG GIT_BRANCH
+ARG VERSION
+
 # Install nginx, supervisor, and required tools
 RUN apk add --no-cache \
     nginx \
@@ -43,6 +49,14 @@ RUN apk add --no-cache \
     && mkdir -p /run/nginx
 
 WORKDIR /app
+
+# Create build info file
+RUN echo "{\
+  \"buildDate\": \"${BUILD_DATE:-unknown}\",\
+  \"gitCommit\": \"${GIT_COMMIT:-unknown}\",\
+  \"gitBranch\": \"${GIT_BRANCH:-unknown}\",\
+  \"version\": \"${VERSION:-dev}\"\
+}" > /app/build-info.json
 
 # Copy backend source code
 COPY backend/ ./backend/
