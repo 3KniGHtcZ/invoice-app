@@ -56,8 +56,8 @@ class AuthService {
       console.log('Expires at:', tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : 'NULL')
       console.log('====================================')
 
-      // Set credentials on the client for future API calls
-      this.oauth2Client.setCredentials(tokens)
+      // Note: Not setting credentials on shared instance to avoid concurrency issues
+      // Tokens are returned and will be saved separately
 
       // Get user info
       let userInfo: UserInfo | null = null
@@ -68,6 +68,11 @@ class AuthService {
               Authorization: `Bearer ${tokens.access_token}`,
             },
           })
+
+          if (!response.ok) {
+            throw new Error(`Failed to fetch user info: ${response.status} ${response.statusText}`)
+          }
+
           const data = await response.json()
           userInfo = {
             id: data.id,
@@ -101,13 +106,20 @@ class AuthService {
     expiresOn: Date | null
   }> {
     try {
+      // Create a new OAuth2Client instance for this operation to avoid race conditions
+      const oauth2Client = new OAuth2Client(
+        googleConfig.clientId,
+        googleConfig.clientSecret,
+        googleConfig.redirectUri
+      )
+
       // Set the refresh token
-      this.oauth2Client.setCredentials({
+      oauth2Client.setCredentials({
         refresh_token: refreshToken,
       })
 
       // Get new access token
-      const { credentials } = await this.oauth2Client.refreshAccessToken()
+      const { credentials } = await oauth2Client.refreshAccessToken()
 
       console.log('=== Google OAuth Refresh Token Response ===')
       console.log('Has access token:', !!credentials.access_token)
