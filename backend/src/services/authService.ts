@@ -1,27 +1,36 @@
-import { ConfidentialClientApplication, AuthorizationUrlRequest, AuthorizationCodeRequest, AccountInfo } from '@azure/msal-node'
-import { msalConfig, REDIRECT_URI, SCOPES } from '../config/msalConfig.js'
+import { OAuth2Client } from 'google-auth-library'
+import { googleConfig, SCOPES } from '../config/googleConfig.js'
+
+export interface UserInfo {
+  id: string
+  email: string
+  name: string
+  picture?: string
+}
 
 class AuthService {
-  private msalClient: ConfidentialClientApplication
+  private oauth2Client: OAuth2Client
 
   constructor() {
-    this.msalClient = new ConfidentialClientApplication(msalConfig)
+    this.oauth2Client = new OAuth2Client(
+      googleConfig.clientId,
+      googleConfig.clientSecret,
+      googleConfig.redirectUri
+    )
   }
 
   /**
-   * Generate the Microsoft login URL
+   * Generate the Google OAuth login URL
    */
   async getAuthUrl(): Promise<string> {
-    const authCodeUrlParameters: AuthorizationUrlRequest = {
-      scopes: SCOPES,
-      redirectUri: REDIRECT_URI,
-      prompt: 'consent', // Force consent dialog to ensure refresh token is returned
-      responseMode: 'query',
-    }
-
     try {
-      const response = await this.msalClient.getAuthCodeUrl(authCodeUrlParameters)
-      return response
+      const authUrl = this.oauth2Client.generateAuthUrl({
+        access_type: 'offline', // Required to get refresh token
+        scope: SCOPES,
+        prompt: 'consent', // Force consent dialog to ensure refresh token is returned
+      })
+
+      return authUrl
     } catch (error) {
       console.error('Error generating auth URL:', error)
       throw new Error('Failed to generate authentication URL')
@@ -33,24 +42,49 @@ class AuthService {
    */
   async acquireTokenByCode(code: string): Promise<{
     accessToken: string
-    refreshToken: string | undefined
+    refreshToken: string | null | undefined
     expiresOn: Date | null
-    account: AccountInfo | null
+    account: UserInfo | null
   }> {
-    const tokenRequest: AuthorizationCodeRequest = {
-      code,
-      scopes: SCOPES,
-      redirectUri: REDIRECT_URI,
-    }
-
     try {
-      const response = await this.msalClient.acquireTokenByCode(tokenRequest)
+      const { tokens } = await this.oauth2Client.getToken(code)
+
+      console.log('=== Google OAuth Token Response ===')
+      console.log('Has access token:', !!tokens.access_token)
+      console.log('Has refresh token:', !!tokens.refresh_token)
+      console.log('Refresh token value:', tokens.refresh_token || 'NULL')
+      console.log('Expires at:', tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : 'NULL')
+      console.log('====================================')
+
+      // Set credentials on the client for future API calls
+      this.oauth2Client.setCredentials(tokens)
+
+      // Get user info
+      let userInfo: UserInfo | null = null
+      if (tokens.access_token) {
+        try {
+          const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: {
+              Authorization: `Bearer ${tokens.access_token}`,
+            },
+          })
+          const data = await response.json()
+          userInfo = {
+            id: data.id,
+            email: data.email,
+            name: data.name || data.email,
+            picture: data.picture,
+          }
+        } catch (err) {
+          console.error('Error fetching user info:', err)
+        }
+      }
 
       return {
-        accessToken: response.accessToken,
-        refreshToken: response.refreshToken,
-        expiresOn: response.expiresOn,
-        account: response.account,
+        accessToken: tokens.access_token!,
+        refreshToken: tokens.refresh_token,
+        expiresOn: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+        account: userInfo,
       }
     } catch (error) {
       console.error('Error acquiring token by code:', error)
@@ -63,19 +97,28 @@ class AuthService {
    */
   async refreshAccessToken(refreshToken: string): Promise<{
     accessToken: string
-    refreshToken: string | undefined
+    refreshToken: string | null | undefined
     expiresOn: Date | null
   }> {
     try {
-      const response = await this.msalClient.acquireTokenByRefreshToken({
-        refreshToken,
-        scopes: SCOPES,
+      // Set the refresh token
+      this.oauth2Client.setCredentials({
+        refresh_token: refreshToken,
       })
 
+      // Get new access token
+      const { credentials } = await this.oauth2Client.refreshAccessToken()
+
+      console.log('=== Google OAuth Refresh Token Response ===')
+      console.log('Has access token:', !!credentials.access_token)
+      console.log('Has refresh token:', !!credentials.refresh_token)
+      console.log('Expires at:', credentials.expiry_date ? new Date(credentials.expiry_date).toISOString() : 'NULL')
+      console.log('==========================================')
+
       return {
-        accessToken: response.accessToken,
-        refreshToken: response.refreshToken,
-        expiresOn: response.expiresOn,
+        accessToken: credentials.access_token!,
+        refreshToken: credentials.refresh_token || refreshToken, // Keep old refresh token if new one not provided
+        expiresOn: credentials.expiry_date ? new Date(credentials.expiry_date) : null,
       }
     } catch (error) {
       console.error('Error refreshing token:', error)

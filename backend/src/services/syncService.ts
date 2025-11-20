@@ -1,4 +1,4 @@
-import { graphService } from './graphService'
+import { gmailService } from './gmailService'
 import { databaseService } from './databaseService'
 import { invoiceExtractionService } from './invoiceExtractionService'
 import { discordNotificationService } from './discordNotificationService'
@@ -22,7 +22,7 @@ class SyncService {
       const startTime = new Date().toISOString()
 
       // Fetch current emails
-      const emails = await graphService.getEmailsFromFolder(accessToken, 'faktury')
+      const emails = await gmailService.getEmailsFromFolder(accessToken, 'faktury')
       const currentEmailIds = new Set(emails.map((e: any) => e.id))
 
       // Find new emails
@@ -44,7 +44,7 @@ class SyncService {
         for (const email of newEmails) {
           try {
             // Get attachments for this email
-            const attachments = await graphService.getEmailAttachments(accessToken, email.id)
+            const attachments = await gmailService.getEmailAttachments(accessToken, email.id)
 
             // Filter PDF attachments
             const pdfAttachments = attachments.filter((att: any) =>
@@ -62,7 +62,7 @@ class SyncService {
                 }
 
                 // Get PDF content
-                const contentBytes = await graphService.getAttachmentContent(
+                const contentBytes = await gmailService.getAttachmentContent(
                   accessToken,
                   email.id,
                   attachment.id

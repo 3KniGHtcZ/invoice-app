@@ -1,19 +1,7 @@
-import { ConfidentialClientApplication } from '@azure/msal-node'
+import { authService } from './authService.js'
 import { databaseService, AuthTokens } from './databaseService'
 
 class TokenManagerService {
-  private msalClient: ConfidentialClientApplication
-
-  constructor() {
-    this.msalClient = new ConfidentialClientApplication({
-      auth: {
-        clientId: process.env.AZURE_CLIENT_ID!,
-        authority: `https://login.microsoftonline.com/consumers`,
-        clientSecret: process.env.AZURE_CLIENT_SECRET!,
-      },
-    })
-  }
-
   /**
    * Save tokens to database after successful authentication
    */
@@ -73,20 +61,17 @@ class TokenManagerService {
       return null
     }
     try {
-      const refreshRequest = {
-        refreshToken: refreshToken,
-        scopes: [
-          'https://graph.microsoft.com/Mail.Read',
-          'https://graph.microsoft.com/MailboxFolder.Read',
-          'https://graph.microsoft.com/MailboxItem.Read',
-          'https://graph.microsoft.com/User.Read',
-          'offline_access',
-        ],
-      }
+      console.log('=== Google OAuth Refresh Token Request ===')
+      console.log('Attempting to refresh access token...')
 
-      const response = await this.msalClient.acquireTokenByRefreshToken(refreshRequest)
+      const response = await authService.refreshAccessToken(refreshToken)
 
       if (response) {
+        console.log('=== Google OAuth Refresh Token Response ===')
+        console.log('Has access token:', !!response.accessToken)
+        console.log('Has refresh token:', !!response.refreshToken)
+        console.log('==========================================')
+
         // Save the new tokens using the provided userId
         await this.saveTokens(
           userId,
