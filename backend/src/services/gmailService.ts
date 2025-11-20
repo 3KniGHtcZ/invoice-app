@@ -223,7 +223,11 @@ class GmailService {
       const base64Data = attachment.data.data || ''
 
       // Convert base64url to base64
-      const standardBase64 = base64Data.replace(/-/g, '+').replace(/_/g, '/')
+      let standardBase64 = base64Data.replace(/-/g, '+').replace(/_/g, '/')
+
+      // Add padding if necessary (RFC 4648)
+      const padding = (4 - (standardBase64.length % 4)) % 4
+      standardBase64 += '='.repeat(padding)
 
       return standardBase64
     } catch (error) {
