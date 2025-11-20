@@ -60,11 +60,12 @@ describe('cn utility', () => {
   })
 
   it('should handle mixed input types', () => {
+    const isEnabled = true
     const result = cn(
       'base',
       ['array-1', 'array-2'],
       { 'obj-1': true, 'obj-2': false },
-      true && 'conditional',
+      isEnabled && 'conditional',
       undefined,
       null
     )

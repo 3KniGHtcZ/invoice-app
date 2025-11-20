@@ -4,12 +4,15 @@ import { useAuth } from './useAuth'
 
 // Mock fetch globally
 const mockFetch = vi.fn()
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 global.fetch = mockFetch as any
 
 describe('useAuth', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (window as any).location
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).location = { href: '' }
   })
 
