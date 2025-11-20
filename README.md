@@ -1,6 +1,6 @@
 # Invoice App
 
-Invoice management application with Microsoft Outlook integration and AI-powered invoice data extraction.
+Invoice management application with Gmail integration and AI-powered invoice data extraction.
 
 ## Running the Application
 

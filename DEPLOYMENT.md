@@ -41,30 +41,31 @@ docker-compose up -d
 - Git
 - Nginx na NAS (pro reverse proxy)
 
-### Azure AD App Registration
+### Google Cloud Console Setup
 
-Aplikace vyžaduje Azure AD pro OAuth autentizaci:
+Aplikace vyžaduje Google OAuth 2.0 pro autentizaci:
 
-1. Přejděte na [Azure Portal](https://portal.azure.com)
-2. Navigate to **App registrations** → **New registration**
-3. Name: `Invoice App`
-4. Supported account types: **Personal Microsoft accounts only**
-5. Redirect URI: `Web` → `https://yourdomain.com/api/auth/callback`
-6. Zaregistrujte aplikaci
+1. Přejděte na [Google Cloud Console](https://console.cloud.google.com/)
+2. Vytvořte nový projekt nebo vyberte existující
+3. Navigate to **APIs & Services** → **Library**
+4. Povolte **Gmail API**
+5. Navigate to **APIs & Services** → **OAuth consent screen**
+6. User type: **External**, vyplňte app information
+7. Přidejte scopes:
+   - `https://www.googleapis.com/auth/gmail.readonly`
+   - `https://www.googleapis.com/auth/userinfo.profile`
+   - `https://www.googleapis.com/auth/userinfo.email`
+8. Přidejte test users (vaše Gmail adresy)
 
-**Po registraci:**
+**OAuth 2.0 Credentials:**
 
-1. Zkopírujte **Application (client) ID** → použijte jako `AZURE_CLIENT_ID`
-2. **Certificates & secrets** → **New client secret** → zkopírujte hodnotu → `AZURE_CLIENT_SECRET`
-3. **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**:
-   - `Mail.Read`
-   - `MailboxFolder.Read`
-   - `MailboxItem.Read`
-   - `User.Read`
-   - `offline_access`
-   - `openid`
-   - `profile`
-4. **Grant admin consent** (pokud je potřeba)
+1. Navigate to **APIs & Services** → **Credentials**
+2. **Create Credentials** → **OAuth client ID**
+3. Application type: **Web application**
+4. Name: `Invoice App Web Client`
+5. Authorized redirect URIs: `https://yourdomain.com/api/auth/callback`
+6. Zkopírujte **Client ID** → použijte jako `GOOGLE_CLIENT_ID`
+7. Zkopírujte **Client Secret** → použijte jako `GOOGLE_CLIENT_SECRET`
 
 ### Google Gemini API Key
 
@@ -89,10 +90,9 @@ cp .env.production.example .env.production
 Vyplňte následující hodnoty:
 
 ```bash
-# Azure AD
-AZURE_CLIENT_ID=your-azure-client-id-here
-AZURE_CLIENT_SECRET=your-azure-client-secret-here
-AZURE_TENANT_ID=consumers
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 
 # Application URLs (upravte pro vaši doménu)
 FRONTEND_URL=https://yourdomain.com
@@ -104,6 +104,9 @@ SESSION_SECRET=$(openssl rand -hex 64)
 
 # Cookie Domain (volitelné, pro subdomény)
 COOKIE_DOMAIN=.yourdomain.com
+
+# Cookie Security
+COOKIE_SECURE=true
 
 # API Keys
 GEMINI_API_KEY=your-gemini-api-key-here
@@ -122,7 +125,7 @@ openssl rand -hex 64
 ### 3. Ověření konfigurace
 
 Zkontrolujte, že:
-- ✅ Azure AD callback URL je `https://yourdomain.com/api/auth/callback`
+- ✅ Google OAuth callback URL je `https://yourdomain.com/api/auth/callback`
 - ✅ `FRONTEND_URL` je v `ALLOWED_ORIGINS`
 - ✅ `SESSION_SECRET` je dlouhý náhodný string
 - ✅ Všechny API klíče jsou platné
@@ -385,12 +388,13 @@ netstat -tuln | grep 9080
 docker ps -a
 ```
 
-### Azure AD OAuth nefunguje
+### Google OAuth nefunguje
 
-1. Ověřte, že callback URL v Azure AD je: `https://yourdomain.com/api/auth/callback`
+1. Ověřte, že callback URL v Google Cloud Console je: `https://yourdomain.com/api/auth/callback`
 2. Zkontrolujte, že `REDIRECT_URI` v `.env.production` je stejná
 3. Ověřte, že `FRONTEND_URL` je správná
 4. Zkontrolujte logy: `docker logs invoice-app | grep -i auth`
+5. Zkontrolujte, že jste přidali test users v OAuth consent screen
 
 ### Databáze se neukládá
 
@@ -413,10 +417,11 @@ ls -la /path/to/data/*.db
 
 ### Email sync nefunguje
 
-1. Ověřte, že jste přihlášeni přes Azure AD
-2. Zkontrolujte API permissions v Azure Portal
-3. Zkontrolujte logy: `docker logs invoice-app | grep -i sync`
-4. Manuální trigger: přes UI tlačítko "Sync Emails"
+1. Ověřte, že jste přihlášeni přes Google OAuth
+2. Zkontrolujte, že máte Gmail label "faktury" (nebo jiný název v kódu)
+3. Zkontrolujte Gmail API permissions v Google Cloud Console
+4. Zkontrolujte logy: `docker logs invoice-app | grep -i sync`
+5. Manuální trigger: přes UI tlačítko "Sync Emails"
 
 ### Health check failuje
 
@@ -505,8 +510,8 @@ Docker Container :9080
     │   └─ /api/* → Backend
     └─ Node.js Backend :3000
         ├─ Express API
-        ├─ Azure AD OAuth
-        ├─ Microsoft Graph
+        ├─ Google OAuth 2.0
+        ├─ Gmail API
         ├─ Gemini AI
         └─ SQLite DB (/app/data)
 ```

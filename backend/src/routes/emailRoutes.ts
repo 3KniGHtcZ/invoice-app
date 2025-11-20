@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express'
-import { graphService } from '../services/graphService'
+import { gmailService } from '../services/gmailService'
 import { requireAuth } from '../middleware/requireAuth'
 import { invoiceExtractionService } from '../services/invoiceExtractionService'
 import { databaseService } from '../services/databaseService'
@@ -13,7 +13,7 @@ const router = Router()
 router.get('/folders', requireAuth, cachePresets.mediumCache, async (req: Request, res: Response) => {
   try {
     const accessToken = req.accessToken!
-    const folders = await graphService.listAllFolders(accessToken)
+    const folders = await gmailService.listAllFolders(accessToken)
     res.json(folders)
   } catch (error) {
     console.error('Error listing folders:', error)
@@ -25,7 +25,7 @@ router.get('/folders', requireAuth, cachePresets.mediumCache, async (req: Reques
 router.get('/faktury', requireAuth, cachePresets.shortCache, async (req: Request, res: Response) => {
   try {
     const accessToken = req.accessToken!
-    const emails = await graphService.getEmailsFromFolder(accessToken, 'faktury')
+    const emails = await gmailService.getEmailsFromFolder(accessToken, 'faktury')
 
     // Add extraction status to each email
     const emailsWithStatus = emails.map((email: any) => ({
@@ -55,7 +55,7 @@ router.post('/attachments/batch', requireAuth, cachePresets.mediumCache, async (
     }
 
     const accessToken = req.accessToken!
-    const batchAttachments = await graphService.getBatchEmailAttachments(accessToken, messageIds)
+    const batchAttachments = await gmailService.getBatchEmailAttachments(accessToken, messageIds)
     res.json(batchAttachments)
   } catch (error) {
     console.error('Error fetching batch attachments:', error)
@@ -68,7 +68,7 @@ router.get('/:messageId/attachments', requireAuth, cachePresets.mediumCache, asy
   try {
     const { messageId } = req.params
     const accessToken = req.accessToken!
-    const attachments = await graphService.getEmailAttachments(accessToken, messageId)
+    const attachments = await gmailService.getEmailAttachments(accessToken, messageId)
     res.json(attachments)
   } catch (error) {
     console.error('Error fetching attachments:', error)
@@ -84,7 +84,7 @@ router.get(
     try {
       const { messageId, attachmentId } = req.params
       const accessToken = req.accessToken!
-      const contentBytes = await graphService.getAttachmentContent(
+      const contentBytes = await gmailService.getAttachmentContent(
         accessToken,
         messageId,
         attachmentId
@@ -122,7 +122,7 @@ router.post(
       }
 
       // Get PDF content
-      const contentBytes = await graphService.getAttachmentContent(
+      const contentBytes = await gmailService.getAttachmentContent(
         accessToken,
         messageId,
         attachmentId

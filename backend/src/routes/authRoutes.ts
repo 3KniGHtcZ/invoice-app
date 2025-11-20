@@ -6,7 +6,7 @@ const router = Router()
 
 /**
  * GET /api/auth/login
- * Returns the Microsoft login URL for frontend to redirect to
+ * Returns the Google OAuth login URL for frontend to redirect to
  */
 router.get('/login', async (req: Request, res: Response) => {
   try {
@@ -20,7 +20,7 @@ router.get('/login', async (req: Request, res: Response) => {
 
 /**
  * GET /api/auth/callback
- * OAuth callback endpoint - Microsoft redirects here after user logs in
+ * OAuth callback endpoint - Google redirects here after user logs in
  */
 router.get('/callback', async (req: Request, res: Response) => {
   const { code } = req.query
@@ -33,17 +33,17 @@ router.get('/callback', async (req: Request, res: Response) => {
     // Exchange code for tokens
     const tokens = await authService.acquireTokenByCode(code)
 
-    // DEBUG: Log what we got from Microsoft
+    // DEBUG: Log what we got from Google
     console.log('=== OAuth Callback - Token Response ===')
     console.log('Has access token:', !!tokens.accessToken)
     console.log('Has refresh token:', !!tokens.refreshToken)
     console.log('Refresh token value:', tokens.refreshToken ? 'present' : 'NULL')
-    console.log('Account ID:', tokens.account?.homeAccountId)
+    console.log('Account ID:', tokens.account?.id)
     console.log('Expires on:', tokens.expiresOn)
     console.log('=====================================')
 
     // Get userId from account info
-    const userId = tokens.account?.homeAccountId || 'default'
+    const userId = tokens.account?.id || 'default'
     const expiresIn = tokens.expiresOn
       ? Math.floor((tokens.expiresOn.getTime() - Date.now()) / 1000)
       : 3600 // Default to 1 hour if not provided

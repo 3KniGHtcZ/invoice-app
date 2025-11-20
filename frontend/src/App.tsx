@@ -152,10 +152,10 @@ function App() {
             <CardHeader>
               <CardTitle className="text-2xl flex items-center gap-2">
                 <Mail className="w-6 h-6" />
-                Connect to Outlook
+                Connect to Gmail
               </CardTitle>
               <CardDescription>
-                Sign in to access your invoice emails
+                Sign in with Google to access your invoice emails
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -166,7 +166,7 @@ function App() {
                 size="lg"
               >
                 <Mail className="w-4 h-4 mr-2" />
-                {auth.loading ? 'Connecting...' : 'Connect Outlook Account'}
+                {auth.loading ? 'Connecting...' : 'Connect Gmail Account'}
               </Button>
             </CardContent>
           </Card>
@@ -178,7 +178,7 @@ function App() {
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>Invoices from "faktury" folder</CardTitle>
+                    <CardTitle>Invoices from "faktury" label</CardTitle>
                     <div className="flex gap-2">
                       <Button onClick={handleSync} disabled={emails.syncing} size="sm" variant="outline">
                         <Cloud className="w-4 h-4 mr-2" />
@@ -206,7 +206,7 @@ function App() {
                     </div>
                   ) : emails.emails.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
-                      No emails found in "faktury" folder
+                      No emails found in "faktury" label
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">

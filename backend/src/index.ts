@@ -30,7 +30,7 @@ app.use(
         scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline needed for OAuth callback page
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'", 'https://login.microsoftonline.com', 'https://graph.microsoft.com'],
+        connectSrc: ["'self'", 'https://accounts.google.com', 'https://www.googleapis.com'],
         frameSrc: ["'none'"],
         objectSrc: ["'none'"],
       },
