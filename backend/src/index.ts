@@ -90,13 +90,14 @@ app.use(
       dir: sessionDbDir,
     }),
     secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
+    resave: false, // Don't save session if unmodified
+    saveUninitialized: false, // Don't create session until something stored
+    rolling: true, // Reset cookie MaxAge on every request (rolling sessions)
     name: 'invoice.sid', // Don't use default name
     cookie: {
       secure: process.env.COOKIE_SECURE === 'true',
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days (increased from 24 hours)
       sameSite: process.env.COOKIE_SECURE === 'true' ? 'strict' : 'lax',
       domain: process.env.COOKIE_DOMAIN || undefined,
     },

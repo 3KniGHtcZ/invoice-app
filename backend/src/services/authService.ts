@@ -15,6 +15,8 @@ class AuthService {
     const authCodeUrlParameters: AuthorizationUrlRequest = {
       scopes: SCOPES,
       redirectUri: REDIRECT_URI,
+      prompt: 'consent', // Force consent dialog to ensure refresh token is returned
+      responseMode: 'query',
     }
 
     try {

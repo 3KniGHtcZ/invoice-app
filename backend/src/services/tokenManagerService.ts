@@ -103,8 +103,9 @@ class TokenManagerService {
     } catch (error) {
       console.error('Error refreshing access token:', error)
 
-      // If refresh fails, clear tokens to force re-authentication
-      databaseService.clearAuthTokens()
+      // DO NOT clear tokens here - let user sessions handle token cleanup
+      // Background jobs should not delete user tokens
+      // Tokens will be cleared when user explicitly logs out or on next user request
       return null
     }
   }
