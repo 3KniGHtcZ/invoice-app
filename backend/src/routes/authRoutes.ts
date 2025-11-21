@@ -60,9 +60,36 @@ router.get('/callback', async (req: Request, res: Response) => {
     req.session.userId = userId
     req.session.isAuthenticated = true
 
-    // Redirect back to frontend
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    res.redirect(frontendUrl)
+    // DEBUG: Log session before save
+    console.log('=== Session Before Save ===')
+    console.log('Session ID:', req.sessionID)
+    console.log('Session userId:', req.session.userId)
+    console.log('Session isAuthenticated:', req.session.isAuthenticated)
+    console.log('Session cookie:', req.session.cookie)
+    console.log('===========================')
+
+    // Explicitly save session before redirect to ensure cookie is set
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err)
+      } else {
+        console.log('=== Session Saved Successfully ===')
+        console.log('Session ID:', req.sessionID)
+        console.log('Cookie settings:', {
+          secure: req.session.cookie.secure,
+          httpOnly: req.session.cookie.httpOnly,
+          sameSite: req.session.cookie.sameSite,
+          domain: req.session.cookie.domain,
+          maxAge: req.session.cookie.maxAge,
+        })
+        console.log('==================================')
+      }
+
+      // Redirect back to frontend
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+      console.log('Redirecting to:', frontendUrl)
+      res.redirect(frontendUrl)
+    })
   } catch (error) {
     console.error('Callback error:', error)
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
