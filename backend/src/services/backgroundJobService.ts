@@ -1,10 +1,10 @@
-import cron from 'node-cron'
+import cron, { type ScheduledTask } from 'node-cron'
 import { syncService } from './syncService.js'
 import { tokenManagerService } from './tokenManagerService.js'
 import { databaseService } from './databaseService.js'
 
 class BackgroundJobService {
-  private cronJob: cron.ScheduledTask | null = null
+  private cronJob: ScheduledTask | null = null
   private isRunning = false
   private cronSchedule = process.env.BACKGROUND_JOB_CRON || '*/5 * * * *' // Default: every 5 minutes
   private maxRetries = 3

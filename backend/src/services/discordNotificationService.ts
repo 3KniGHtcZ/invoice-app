@@ -1,4 +1,4 @@
-import { InvoiceData } from './databaseService'
+import { InvoiceData } from './invoiceExtractionService'
 
 interface DiscordEmbed {
   title: string
@@ -177,6 +177,7 @@ class DiscordNotificationService {
           title: 'Webhook Test',
           description: 'Discord webhook is working correctly!',
           color: 0x0099ff,
+          fields: [],
           timestamp: new Date().toISOString()
         }]
       }

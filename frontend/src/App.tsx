@@ -22,6 +22,7 @@ function App() {
       emails.fetchEmails(attachments.fetchBatchAttachments)
       emails.fetchSyncStatus()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.isAuthenticated])
 
   // Wrapper functions for hooks
