@@ -19,6 +19,10 @@ const SQLiteStore = connectSqlite3(session)
 const app = express()
 const PORT = process.env.PORT || 3000
 
+// Trust proxy - required for cookies to work behind Cloudflare/nginx
+// This allows Express to read X-Forwarded-Proto header and know the request came via HTTPS
+app.set('trust proxy', 1)
+
 // Middleware
 
 // Security headers
