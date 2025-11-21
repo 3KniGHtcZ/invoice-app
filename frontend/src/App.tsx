@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PDFViewer } from '@/components/PDFViewer'
 import { Mail, FileText, Paperclip, LogOut, Sparkles, RefreshCw, Database, CheckCircle2, Cloud, Clock, AlertCircle, Play, GitBranch, GitCommit } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useEmails } from '@/hooks/useEmails'
@@ -301,10 +302,9 @@ function App() {
                     <CardTitle>PDF Preview</CardTitle>
                   </CardHeader>
                   <CardContent className="h-[calc(100%-5rem)]">
-                    <iframe
-                      src={`/api/emails/${attachments.selectedEmail}/attachments/${attachments.selectedAttachment}`}
-                      className="w-full h-full border rounded"
-                      title="PDF Preview"
+                    <PDFViewer
+                      url={`/api/emails/${attachments.selectedEmail}/attachments/${attachments.selectedAttachment}`}
+                      className="h-full"
                     />
                   </CardContent>
                 </Card>
