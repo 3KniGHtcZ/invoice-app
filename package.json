@@ -17,7 +17,7 @@
     "frontend/**/*.{ts,tsx}": [
       "cd frontend && yarn lint --fix"
     ],
-    "backend/**/*.{ts}": [
+    "backend/**/*.ts": [
       "cd backend && yarn lint --fix"
     ]
   }
