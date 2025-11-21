@@ -33,7 +33,7 @@ jobs:
         run: yarn test
 
       - name: TypeScript check
-        run: npx tsc --noEmit
+        run: yarn tsc --noEmit
 
   frontend-tests:
     name: Frontend Tests
@@ -78,8 +78,9 @@ jobs:
           BACKEND_RESULT="${{ needs.backend-tests.result }}"
           FRONTEND_RESULT="${{ needs.frontend-tests.result }}"
 
+          echo "Backend: $BACKEND_RESULT, Frontend: $FRONTEND_RESULT"
           if [ "$BACKEND_RESULT" != "success" ] || [ "$FRONTEND_RESULT" != "success" ]; then
-            echo "Tests failed!"
+            echo "One or more test suites failed!"
             exit 1
           fi
           echo "All tests passed!"

@@ -8,16 +8,26 @@ const mockFetch = vi.fn()
 global.fetch = mockFetch as any
 
 describe('useAuth', () => {
+  let originalLocation: Location
+
   beforeEach(() => {
     vi.clearAllMocks()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (window as any).location
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(window as any).location = { href: '' }
+    // Save the original location object
+    originalLocation = window.location
+    // Mock window.location.href
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { href: '' }
+    })
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+    // Restore the original location object
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation
+    })
   })
 
   describe('initialization', () => {
