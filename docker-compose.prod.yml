@@ -13,17 +13,22 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Prague
-      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
-      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
-      - AZURE_TENANT_ID=${AZURE_TENANT_ID}
+      # Google OAuth
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      # Application URLs
       - FRONTEND_URL=${FRONTEND_URL}
       - REDIRECT_URI=${REDIRECT_URI}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      # Security & API Keys
       - SESSION_SECRET=${SESSION_SECRET}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
-      - NODE_ENV=${NODE_ENV}
-      - PORT=${PORT}
+      # Optional
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      # Node.js Configuration
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-3000}
+      # Cookie settings
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - COOKIE_SECURE=${COOKIE_SECURE:-true}
     ports:

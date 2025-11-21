@@ -98,7 +98,7 @@ app.use(
       secure: process.env.COOKIE_SECURE === 'true',
       httpOnly: true,
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days (increased from 24 hours)
-      sameSite: process.env.COOKIE_SECURE === 'true' ? 'strict' : 'lax',
+      sameSite: 'lax', // Use 'lax' for better compatibility with redirects
       domain: process.env.COOKIE_DOMAIN || undefined,
     },
   })
