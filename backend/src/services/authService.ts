@@ -53,7 +53,10 @@ class AuthService {
       console.log('Has access token:', !!tokens.access_token)
       console.log('Has refresh token:', !!tokens.refresh_token)
       console.log('Refresh token value:', tokens.refresh_token || 'NULL')
+      console.log('Expiry date (raw):', tokens.expiry_date)
+      console.log('Expiry date (type):', typeof tokens.expiry_date)
       console.log('Expires at:', tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : 'NULL')
+      console.log('Current time:', new Date().toISOString())
       console.log('====================================')
 
       // Note: Not setting credentials on shared instance to avoid concurrency issues

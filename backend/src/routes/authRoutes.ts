@@ -44,9 +44,22 @@ router.get('/callback', async (req: Request, res: Response) => {
 
     // Get userId from account info
     const userId = tokens.account?.id || 'default'
+
+    // DEBUG: Token expiration calculation
+    const now = Date.now()
+    const expiresAtMs = tokens.expiresOn?.getTime() || 0
     const expiresIn = tokens.expiresOn
-      ? Math.floor((tokens.expiresOn.getTime() - Date.now()) / 1000)
+      ? Math.floor((expiresAtMs - now) / 1000)
       : 3600 // Default to 1 hour if not provided
+
+    console.log('=== Token Expiration Calculation ===')
+    console.log('Current time:', new Date(now).toISOString())
+    console.log('Expires at:', tokens.expiresOn?.toISOString())
+    console.log('Expires at (ms):', expiresAtMs)
+    console.log('Current time (ms):', now)
+    console.log('Difference (ms):', expiresAtMs - now)
+    console.log('Expires in (seconds):', expiresIn)
+    console.log('======================================')
 
     // Save tokens to database (single source of truth)
     await tokenManagerService.saveTokens(
