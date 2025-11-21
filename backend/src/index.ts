@@ -88,7 +88,7 @@ app.use(
     store: new SQLiteStore({
       db: 'sessions.db',
       dir: sessionDbDir,
-    }),
+    }) as any,
     secret: process.env.SESSION_SECRET,
     resave: false, // Don't save session if unmodified
     saveUninitialized: false, // Don't create session until something stored
