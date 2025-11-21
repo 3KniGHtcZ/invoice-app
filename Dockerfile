@@ -3,31 +3,35 @@
 # =============================================================================
 FROM node:20-alpine AS frontend-builder
 
-WORKDIR /app/frontend
+WORKDIR /app
 
-# Copy frontend package files
-COPY frontend/package.json frontend/yarn.lock ./
+# Copy root package.json, yarn.lock, and workspace package.json files
+COPY package.json yarn.lock ./
+COPY frontend/package.json ./frontend/package.json
+COPY backend/package.json ./backend/package.json
 
-# Install dependencies
+# Install all dependencies using Yarn Workspaces
 RUN yarn install --frozen-lockfile
 
 # Copy frontend source
-COPY frontend/ ./
+COPY frontend/ ./frontend/
 
 # Build frontend for production
-RUN yarn build
+RUN yarn workspace frontend build
 
 # =============================================================================
 # Stage 2: Prepare Backend Dependencies
 # =============================================================================
 FROM node:20-alpine AS backend-builder
 
-WORKDIR /app/backend
+WORKDIR /app
 
-# Copy backend package files
-COPY backend/package.json backend/yarn.lock ./
+# Copy root package.json, yarn.lock, and workspace package.json files
+COPY package.json yarn.lock ./
+COPY frontend/package.json ./frontend/package.json
+COPY backend/package.json ./backend/package.json
 
-# Install production dependencies only
+# Install production dependencies only using Yarn Workspaces
 RUN yarn install --frozen-lockfile --production
 
 # =============================================================================
@@ -62,6 +66,7 @@ RUN echo "{\
 COPY backend/ ./backend/
 
 # Copy backend node_modules from builder stage
+COPY --from=backend-builder /app/node_modules ./node_modules
 COPY --from=backend-builder /app/backend/node_modules ./backend/node_modules
 
 # Fix permissions for backend directory
