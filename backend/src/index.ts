@@ -94,14 +94,14 @@ app.use((req, res, next) => {
   console.log('========================')
 
   // Log response headers
-  const originalWriteHead = res.writeHead
-  res.writeHead = function(statusCode, ...args) {
+  const originalWriteHead = res.writeHead.bind(res)
+  res.writeHead = function(statusCode: number, ...args: any[]) {
     console.log('=== Response Debug Info ===')
     console.log('Status:', statusCode)
     console.log('Set-Cookie header:', res.getHeader('Set-Cookie'))
     console.log('===========================')
-    return originalWriteHead.apply(res, [statusCode, ...args])
-  }
+    return originalWriteHead(statusCode, ...args)
+  } as typeof res.writeHead
 
   next()
 })
