@@ -79,6 +79,33 @@ app.use(
 )
 app.use(express.json())
 
+// Debug middleware - log all request details
+app.use((req, res, next) => {
+  console.log('=== Request Debug Info ===')
+  console.log('URL:', req.url)
+  console.log('Protocol:', req.protocol)
+  console.log('Secure:', req.secure)
+  console.log('X-Forwarded-Proto:', req.headers['x-forwarded-proto'])
+  console.log('X-Forwarded-For:', req.headers['x-forwarded-for'])
+  console.log('X-Real-IP:', req.headers['x-real-ip'])
+  console.log('Host:', req.headers.host)
+  console.log('Origin:', req.headers.origin)
+  console.log('Cookie header:', req.headers.cookie)
+  console.log('========================')
+
+  // Log response headers
+  const originalWriteHead = res.writeHead
+  res.writeHead = function(statusCode, ...args) {
+    console.log('=== Response Debug Info ===')
+    console.log('Status:', statusCode)
+    console.log('Set-Cookie header:', res.getHeader('Set-Cookie'))
+    console.log('===========================')
+    return originalWriteHead.apply(res, [statusCode, ...args])
+  }
+
+  next()
+})
+
 // Session configuration
 if (!process.env.SESSION_SECRET) {
   throw new Error('SESSION_SECRET environment variable is required')
